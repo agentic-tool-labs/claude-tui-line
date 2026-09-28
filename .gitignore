@@ -1,0 +1,75 @@
+# Build output
+bin/
+obj/
+
+# Publish output. The install flow builds into ${CLAUDE_PLUGIN_DATA}; this directory
+# is a local development target only and must never be committed -- it is ~21MB of
+# platform-specific binary that would be wrong on every machine but the one that built it.
+publish*/
+
+# Local Claude Code session tooling: permission allow-lists, scheduler locks, and
+# agent-routing config. All machine-specific, none of it part of the product.
+.claude/
+
+# .NET
+*.user
+*.suo
+*.userprefs
+project.lock.json
+artifacts/
+[Dd]ebug/
+[Rr]elease/
+[Bb]in/
+[Oo]bj/
+
+# The committed MCP launcher lives at repo-root bin/ (SPEC-90 §4.1), not build output --
+# un-ignore that one directory specifically; nested build bin/s elsewhere are unaffected.
+!/bin/
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+!packages/build/
+
+# Test results
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+coverage*.info
+
+# Rider / Visual Studio / VS Code
+.idea/
+.vs/
+*.sln.docstates
+.vscode/*
+!.vscode/extensions.json
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+.directory
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Editor scratch
+*.swp
+*.swo
+*.bak
+*.orig
+*.rej
+
+# Ad hoc build/test/check-run logs captured at the repo root during orchestration
+/*.log

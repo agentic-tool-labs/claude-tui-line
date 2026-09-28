@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <AssemblyName>claude-tui-line-mcp</AssemblyName>
+    <RootNamespace>ClaudeTuiLineMcp</RootNamespace>
+    <Version>0.4.0</Version>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol" Version="2.2.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- SPEC-83/SPEC-12.6-mcp-tools.md §7.1: the server shares exactly one function with the CLI —
+         ConfigPath.ResolveConfigPath() — and reaches it through this small dependency-free library
+         rather than through a reference to ClaudeTuiLine. There is deliberately no reference to
+         ClaudeTuiLine.csproj: the core is now unreachable from here by construction, and its
+         PublishAot/self-contained setting can no longer block this project's publish (NETSDK1151). -->
+    <ProjectReference Include="../ClaudeTuiLineShared/ClaudeTuiLineShared.csproj" />
+  </ItemGroup>
+
+</Project>

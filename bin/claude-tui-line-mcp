@@ -1,0 +1,23 @@
+#!/bin/sh
+# Resolves the install location written by /claude-tui-line:setup step 2. The
+# expansion lives here rather than in .mcp.json because a config file that does not
+# interpolate variables fails silently and unrecoverably -- the failure
+# commands/setup.md:88-90 and step 5 exist to catch.
+set -eu
+
+BIN_DIR="${CLAUDE_PLUGIN_DATA:-$HOME/.claude/claude-tui-line}/bin"
+SERVER="$BIN_DIR/claude-tui-line-mcp"
+
+if [ ! -x "$SERVER" ]; then
+  echo "claude-tui-line: MCP server not found at $SERVER" >&2
+  echo "Run /claude-tui-line:setup to build it." >&2
+  exit 1
+fi
+
+# CliLocator.cs:18-22 prefers $CLAUDE_PLUGIN_DATA/bin/claude-tui-line. Export the
+# directory this script just resolved so the server's CLI lookup agrees with the
+# launcher's, rather than depending on the server inheriting the same environment.
+CLAUDE_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA:-$HOME/.claude/claude-tui-line}"
+export CLAUDE_PLUGIN_DATA
+
+exec "$SERVER" "$@"

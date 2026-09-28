@@ -1,0 +1,2 @@
+{"session_id":"session-own","kind":"file-touched","timestamp":"2026-08-12T11:59:55Z","path":"/repo/src/Foo.cs"}
+{"session_id":"session-foreign","kind":"file-touched","timestamp":"2026-08-12T11:59:56Z","path":"/repo/src/Bar.cs"}

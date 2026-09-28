@@ -1,0 +1,5 @@
+{
+  "cwd": "/tmp",
+  "totally_unknown_field": { "nested": true },
+  "another_unknown": 123
+}

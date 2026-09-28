@@ -1,0 +1,25 @@
+{
+  "name": "claude-tui-line",
+  "description": "A statusline framework for Claude Code.",
+  "owner": {
+    "name": "Jim Cline",
+    "url": "https://github.com/JimCline"
+  },
+  "plugins": [
+    {
+      "name": "claude-tui-line",
+      "source": "./",
+      "displayName": "claude-tui-line",
+      "description": "Compose your statusline out of panes and items -- built-in ones or your own shell and Python scripts -- rendered inside a bordered TUI surface.",
+      "homepage": "https://github.com/agentic-tool-labs/claude-tui-line",
+      "repository": "https://github.com/agentic-tool-labs/claude-tui-line",
+      "license": "MIT",
+      "keywords": [
+        "statusline",
+        "tui",
+        "dotnet",
+        "spectre-console"
+      ]
+    }
+  ]
+}
