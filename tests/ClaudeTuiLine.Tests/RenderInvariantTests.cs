@@ -16,10 +16,15 @@ namespace ClaudeTuiLine.Tests;
 /// rendering respects whatever width it is given, regardless of where that width came from —
 /// true even under the old, wrong chromeReserve. Only
 /// <see cref="AtLegacyChromeReserve1_TheRealTerminalBudgetCanBeViolated_ProvingTheFixMatters"/>
-/// and <see cref="AtDefaultChromeReserve3_TheRealTerminalBudgetIsNeverViolated"/> anchor
+/// and <see cref="AtChromeReserve3_TheSingleLineTerminalBudgetIsNeverViolated"/> anchor
 /// chromeReserve's value to the measured real-world truncation boundary — a check that would
 /// have caught this defect, since it does not move with whatever chromeReserve the code under
-/// test used to produce the row.
+/// test used to produce the row. NOTE: 3 here is a HISTORICAL figure retained to exercise the
+/// invariant at a second reserve value, not a validated single-line requirement — SPEC-98
+/// leaves it explicitly unresolved whether 3 was ever correct for single-line output, and
+/// shipping a uniform <see cref="ConfigLoader.DefaultChromeReserve"/> (now 4) makes the
+/// question moot in production: single-line renders now get 4 too, so this test exercises a
+/// reserve the product no longer uses anywhere.
 /// </summary>
 public class RenderInvariantTests
 {
@@ -157,7 +162,7 @@ public class RenderInvariantTests
     }
 
     [Fact]
-    public void AtDefaultChromeReserve3_TheRealTerminalBudgetIsNeverViolated()
+    public void AtChromeReserve3_TheSingleLineTerminalBudgetIsNeverViolated()
     {
         foreach (var columns in SweptWidths)
         {
@@ -172,6 +177,56 @@ public class RenderInvariantTests
             {
                 Assert.True(line.Length <= trueBudget, $"COLUMNS={columns}: panel row {line.Length} wide exceeds real budget {trueBudget}: \"{line}\"");
             }
+        }
+    }
+
+    // SPEC-98: a stacked flex layout — content-sized sibling plus a bordered, titled fill pane —
+    // reproducing Jim's shape (project pane + model-pane) that overflowed Claude Code's real
+    // terminal (E3/E5/E6). This is the assertion that would have caught SPEC-98's bug: it fails
+    // against the pre-fix DefaultChromeReserve=3 (fill pane emits 87, one column over budget) and
+    // passes at 4.
+    //
+    // IMPORTANT — what this test does and does not prove: it asserts the fill pane's emitted row
+    // width equals COLUMNS − DefaultChromeReserve, i.e. that a stacked child never exceeds the
+    // surface width it was granted (SPEC-96/97's layout invariant). That holds for ANY value of
+    // DefaultChromeReserve — it is not, and cannot be, a check that 4 is the *correct* number.
+    // Claude Code's own truncation boundary is outside this process (§2.2/§6.2) and was only ever
+    // pinned by a human looking at a real pane (E6). If Claude Code's UI changes and 4 stops being
+    // enough, this test will stay green while the bug returns — only re-running E6 catches that.
+    [Fact]
+    public void Spec98_StackedContentPlusBorderedFillPane_AtColumns90_FillPaneNeverExceedsGrantedSurfaceWidth()
+    {
+        var noBorder = new PaneBorder(new ColorResolution.ColorExpr.Literal("grey"), null, PaneBorderEdges.All);
+        var bordered = new PaneBorder(new ColorResolution.ColorExpr.Literal("grey"), BoxBorder.Rounded, PaneBorderEdges.All);
+
+        var projectPane = new Pane(PaneSplit.None, Array.Empty<Pane>(), "content", bordered, null, "…", null, Array.Empty<PaneItem>());
+        var modelPane = new Pane(PaneSplit.None, Array.Empty<Pane>(), "fill", bordered, null, "…", null, Array.Empty<PaneItem>());
+        var root = new Pane(PaneSplit.Flex, new[] { projectPane, modelPane }, "fill", noBorder, null, "…", null, Array.Empty<PaneItem>(), Gutter: 0, Distribute: PaneDistribute.Greedy);
+
+        var input = new StatusInput();
+        var ctx = new ItemContext(input, gitBranch: null, engram: null, remoteUrlProbe: () => null);
+        var emptyColors = new Dictionary<string, ColorResolution.ColorRule>();
+        var values = ItemValueResolver.Resolve(root, ctx, emptyColors);
+        var notes = new RenderNoteCollector();
+
+        var surfaceWidth = SurfaceLayout.ComputeWidth("90", ConfigLoader.DefaultChromeReserve)!.Value;
+
+        // Force a stack the way Jim's real config does: measure both content leaves as wide enough
+        // that side by side cannot fit at 90, matching E3's captured shape.
+        int MeasureOverride(Pane p, int? w) => 68;
+
+        var resolved = SizeResolver.Resolve(root, surfaceWidth, ctx, values, new Dictionary<string, Segment>(), MeasureOverride, notes);
+        Assert.Equal(PaneSplit.Horizontal, resolved.EffectiveSplit);
+        Assert.Equal(2, resolved.Children.Count);
+
+        var modelResolved = resolved.Children[1];
+        var rendered = PaneTreeRenderer.Render(modelResolved, ctx, values, emptyColors, new Dictionary<string, Segment>(), new RenderNoteCollector());
+
+        Assert.NotEmpty(rendered.Buffer.Rows);
+        foreach (var row in rendered.Buffer.Rows)
+        {
+            var stripped = DisplayWidth.Strip(row.Markup);
+            Assert.True(stripped.Length <= surfaceWidth, $"model-pane row {stripped.Length} wide exceeds granted surface width {surfaceWidth}: \"{stripped}\"");
         }
     }
 }

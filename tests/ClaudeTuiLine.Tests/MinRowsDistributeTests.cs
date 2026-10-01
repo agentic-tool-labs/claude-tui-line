@@ -522,7 +522,9 @@ public class MinRowsDistributeTests
             File.Delete(path);
         }
 
-        var surfaceWidth = SurfaceLayout.ComputeWidth("50", topLevel.ChromeReserve)!.Value;
+        // SPEC-98 bumped DefaultChromeReserve 3 -> 4; COLUMNS bumped 50 -> 51 to hold surfaceWidth
+        // at the same 47 this test was calibrated against.
+        var surfaceWidth = SurfaceLayout.ComputeWidth("51", topLevel.ChromeReserve)!.Value;
         var values = ItemValueResolver.Resolve(pane, Ctx, topLevel.Colors);
         var notes = new RenderNoteCollector();
 
@@ -594,7 +596,9 @@ public class MinRowsDistributeTests
     public void FeasiblePath_MinRows_UnaffectedByOverAllocationGuard()
     {
         var (topLevel, pane) = LoadConfig();
-        var surfaceWidth = SurfaceLayout.ComputeWidth("112", topLevel.ChromeReserve)!.Value;
+        // SPEC-98 bumped DefaultChromeReserve 3 -> 4; COLUMNS bumped 112 -> 113 to hold surfaceWidth
+        // at the same value this test's pinned 54/54 widths were calibrated against.
+        var surfaceWidth = SurfaceLayout.ComputeWidth("113", topLevel.ChromeReserve)!.Value;
         var values = ItemValueResolver.Resolve(pane, Ctx, topLevel.Colors);
 
         var resolved = SizeResolver.Resolve(pane, surfaceWidth, Ctx, values,new Dictionary<string, Segment>(),  new RenderNoteCollector());
@@ -656,7 +660,9 @@ public class MinRowsDistributeTests
             File.Delete(path);
         }
 
-        var surfaceWidth = SurfaceLayout.ComputeWidth("52", topLevel.ChromeReserve)!.Value;
+        // SPEC-98 bumped DefaultChromeReserve 3 -> 4; COLUMNS bumped 52 -> 53 to hold surfaceWidth
+        // at the same value this test's boundary-cost recomputation was calibrated against.
+        var surfaceWidth = SurfaceLayout.ComputeWidth("53", topLevel.ChromeReserve)!.Value;
         var values = ItemValueResolver.Resolve(pane, Ctx, topLevel.Colors);
         var notes = new RenderNoteCollector();
 
