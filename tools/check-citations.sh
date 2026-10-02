@@ -31,7 +31,7 @@
 
 set -uo pipefail
 
-SPEC="${1:-$(dirname "$0")/../SPEC-V2-FRAMEWORK.md}"
+SPEC="${1:-$(dirname "$0")/../docs/specs/SPEC-V2-FRAMEWORK.md}"
 
 if [[ ! -f "$SPEC" ]]; then
     echo "check-citations: no such file: $SPEC" >&2

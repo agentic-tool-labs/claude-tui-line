@@ -8,8 +8,8 @@ Written in C# on .NET 10 with [Spectre.Console](https://spectreconsole.net/), pu
 Native AOT binary so it starts fast enough to run on every render.
 
 > **Status: pre-1.0 and moving.** The rendering engine is built and tested; the CLI, the authoring
-> commands, and the MCP tools are not. See [STATUS.md](STATUS.md) for what is done and what is
-> left, and [SPEC-V2-FRAMEWORK.md](SPEC-V2-FRAMEWORK.md) for the architecture.
+> commands, and the MCP tools are not. See [STATUS.md](docs/STATUS.md) for what is done and what is
+> left, and [SPEC-V2-FRAMEWORK.md](docs/specs/SPEC-V2-FRAMEWORK.md) for the architecture.
 
 ## Why a framework
 
@@ -522,7 +522,7 @@ Drop `workspace` for plain text with no hyperlink. A branch with no matching tic
 `main`) renders nothing at all — not an empty segment.
 
 For any other tracker (Jira, Shortcut, ...), derived items plus a hyperlink do the same job —
-see [SPEC-V2-FRAMEWORK.md §3.2](SPEC-V2-FRAMEWORK.md) for the underlying mechanism this recipe
+see [SPEC-V2-FRAMEWORK.md §3.2](docs/specs/SPEC-V2-FRAMEWORK.md) for the underlying mechanism this recipe
 is built from:
 
 ```json
@@ -614,16 +614,16 @@ then truncate, then drop.
 
 ## Contributing
 
-The architecture lives in [SPEC-V2-FRAMEWORK.md](SPEC-V2-FRAMEWORK.md) and is the source of truth
+The architecture lives in [SPEC-V2-FRAMEWORK.md](docs/specs/SPEC-V2-FRAMEWORK.md) and is the source of truth
 — it is written to be argued with, and sections are cited by number in commit messages and code
-comments. [STATUS.md](STATUS.md) tracks what is built.
+comments. [STATUS.md](docs/STATUS.md) tracks what is built.
 
-Two older documents are still in the repo and still matter. [CAPTURE.md](CAPTURE.md) is the
+Two older documents are still in the repo and still matter. [CAPTURE.md](docs/CAPTURE.md) is the
 behavioural capture of the original bash statusline, and it is normative for parity questions.
-[SPEC.md](SPEC.md) is v1 — superseded on architecture, but v2 cites it by number in four places
+[SPEC.md](docs/SPEC.md) is v1 — superseded on architecture, but v2 cites it by number in four places
 and those rulings stand. Its own header says which. New rules go in SPEC-V2-FRAMEWORK.md.
 
-**Before you build, read [SPEC-V2-FRAMEWORK.md §14](SPEC-V2-FRAMEWORK.md).** `publish/` is what a
+**Before you build, read [SPEC-V2-FRAMEWORK.md §14](docs/specs/SPEC-V2-FRAMEWORK.md).** `publish/` is what a
 user's live statusline executes, so writing there replaces a running program and is a deploy
 rather than a build; development and verification build to the SDK-default output instead.
 

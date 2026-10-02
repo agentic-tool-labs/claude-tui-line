@@ -24,7 +24,7 @@ set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 2
 
-SPEC="SPEC-V2-FRAMEWORK.md"
+SPEC="docs/specs/SPEC-V2-FRAMEWORK.md"
 MARKER="pinned-notes"
 
 [[ -f "$SPEC" ]] || { echo "check-notes: no such file: $SPEC" >&2; exit 2; }

@@ -119,7 +119,10 @@ public class DropFloorPredicateTests
         """;
 
         var (topLevel, pane) = LoadConfig(configJson);
-        var surfaceWidth = SurfaceLayout.ComputeWidth("52", topLevel.ChromeReserve)!.Value;
+        // SPEC-98 bumped DefaultChromeReserve 3 -> 4; COLUMNS bumped 52 -> 53 to hold surfaceWidth
+        // at the same 49 this test was calibrated against, so the min-rows-fallback behaviour under
+        // test is unchanged.
+        var surfaceWidth = SurfaceLayout.ComputeWidth("53", topLevel.ChromeReserve)!.Value;
         var values = ItemValueResolver.Resolve(pane, Ctx, topLevel.Colors);
         var notes = new RenderNoteCollector();
 
