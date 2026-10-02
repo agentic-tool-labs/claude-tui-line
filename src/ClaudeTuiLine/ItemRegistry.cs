@@ -64,7 +64,8 @@ public static class ItemRegistry
             ctx => SegmentBuilder.BuildGitBranch(ctx.GitBranch),
             ItemColorKind.Decorative,
             DefaultLinkTemplate: GitBranchDefaultLink),
-        new("repo", "the workspace repo as owner/name", ctx => SegmentBuilder.ResolveRepo(ctx.Input.Workspace?.Repo), ctx => SegmentBuilder.BuildRepo(ctx.Input.Workspace?.Repo), ItemColorKind.Decorative),
+        new("repo", "the workspace repo as owner/name", ctx => SegmentBuilder.ResolveRepo(ctx.Input.Workspace?.Repo), ctx => SegmentBuilder.BuildRepo(ctx.Input.Workspace?.Repo), ItemColorKind.Decorative,
+            DefaultLinkTemplate: RepoDefaultLink),
         new("worktree", "the worktree's name when the session is in one, plus its branch when showBranch is enabled", ctx => SegmentBuilder.ResolveWorktree(ctx.Input.Worktree, ctx.ItemSettings?.Worktree), ctx => SegmentBuilder.BuildWorktree(ctx.Input.Worktree, ctx.ItemSettings?.Worktree), ItemColorKind.Decorative),
         new("pr", "the pull request number and its review state; links to the pull request on the repo host", ctx => SegmentBuilder.ResolvePullRequest(ctx.Input.Pr, ctx.ItemSettings?.Pr), ctx => SegmentBuilder.BuildPullRequest(ctx.Input.Pr, ctx.ItemSettings?.Pr), ItemColorKind.Decorative,
             DefaultLinkTemplate: PrDefaultLink),
@@ -157,6 +158,11 @@ public static class ItemRegistry
         ctx.ItemSettings?.Linear?.Workspace is { Length: > 0 } ws
             ? $"https://linear.app/{ws}/issue/{{}}"
             : null;
+
+    // Links to the repo's web page using the git remote, the same source git-branch uses, so the
+    // host is never taken from the payload.
+    private static string? RepoDefaultLink(ItemContext ctx) =>
+        ctx.RemoteUrl is { Length: > 0 } remote ? EscapeTemplateLiteral(remote) : null;
 
     // The value substituted for `{}` is not URL-escaped (LeafContent.cs:123 strips ANSI and nothing
     // else), and a branch name may legally contain `#` and `%` — so the branch is escaped here and the

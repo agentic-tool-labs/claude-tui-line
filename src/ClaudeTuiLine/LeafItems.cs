@@ -68,7 +68,7 @@ public static class LeafItems
                 display = merged;
             }
 
-            var defaultLink = key is { } linkId ? ItemRegistry.Find(linkId)?.DefaultLinkTemplate?.Invoke(ctx) : null;
+            var defaultLink = item.Link is null && key is { } linkId ? ItemRegistry.Find(linkId)?.DefaultLinkTemplate?.Invoke(ctx) : null;
             resolved.Add(new ResolvedItem(item, value, display, defaultLink));
         }
 

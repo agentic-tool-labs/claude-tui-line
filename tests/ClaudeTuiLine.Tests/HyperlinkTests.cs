@@ -707,6 +707,43 @@ public class HyperlinkTests
     }
 
     [Fact]
+    public void Repo_RemoteConfigured_DefaultLinksToRemote()
+    {
+        var input = new StatusInput
+        {
+            Workspace = new WorkspaceInfo { Repo = new RepoInfo { Owner = "o", Name = "r" } },
+        };
+        var ctx = new ItemContext(input, gitBranch: null, engram: null, remoteUrlProbe: () => "https://gitlab.example.com/o/r");
+
+        var item = new PaneItem("repo", null, null, null);
+        var values = new Dictionary<string, string?> { ["repo"] = ItemRegistry.Find("repo")!.ResolveValue(ctx) };
+        var resolved = LeafItems.Resolve(new[] { item }, values, ctx, new Dictionary<string, Segment>()).Single();
+        var decision = LeafContent.Decide(resolved, values, new Dictionary<string, Segment>());
+
+        Assert.Equal("o/r", decision.Text);
+        Assert.True(OscHyperlink.TryUnwrap(decision.Markup, out var url, out _));
+        Assert.Equal("https://gitlab.example.com/o/r", url);
+    }
+
+    [Fact]
+    public void Repo_NoRemote_PlainTextNoHyperlink()
+    {
+        var input = new StatusInput
+        {
+            Workspace = new WorkspaceInfo { Repo = new RepoInfo { Owner = "o", Name = "r" } },
+        };
+        var ctx = new ItemContext(input, gitBranch: null, engram: null, remoteUrlProbe: () => null);
+
+        var item = new PaneItem("repo", null, null, null);
+        var values = new Dictionary<string, string?> { ["repo"] = ItemRegistry.Find("repo")!.ResolveValue(ctx) };
+        var resolved = LeafItems.Resolve(new[] { item }, values, ctx, new Dictionary<string, Segment>()).Single();
+        var decision = LeafContent.Decide(resolved, values, new Dictionary<string, Segment>());
+
+        Assert.Equal("o/r", decision.Text);
+        Assert.False(OscHyperlink.TryUnwrap(decision.Markup, out _, out _));
+    }
+
+    [Fact]
     public void GitBranch_NoRemote_PlainTextNoHyperlink()
     {
         var input = new StatusInput();
