@@ -35,9 +35,17 @@ from source rather than shipping a binary.
 /claude-tui-line:setup
 ```
 
-`setup` checks your toolchain, builds into the plugin's data directory, **backs up whatever
-statusline you already have** before touching anything, writes the new `statusLine` setting, and
-shows you a rendered preview.
+You need the .NET 10 SDK, `jq`, and the `claude` CLI on your PATH.
+
+`setup` checks your toolchain and shows you a plan of everything it would change. Nothing is
+written until you approve it. It then builds, **backs up whatever statusline you already have**
+before touching anything, writes the new `statusLine` setting, and shows you a rendered preview.
+
+The binaries go to `~/.claude/claude-tui-line/bin`, not into the plugin directory, so they survive
+plugin updates and removal. Re-run `/claude-tui-line:setup` after a `/plugin update`: a one-line
+notice at session start tells you when the installed binaries are older than the plugin, and it
+never builds anything itself. If the marketplace you added is a local clone, setup hands off to
+that clone's `install.sh`.
 
 If you're working from a local checkout instead of installing from GitHub — e.g. you cloned the
 repo to contribute, or you want the plugin's commands to track your working tree instead of a
@@ -81,7 +89,8 @@ cd claude-tui-line
 `install.sh` builds both the CLI and the MCP server into gitignored `publish/`/`publish-mcp/`
 staging directories, then — with separate consent, since this replaces a binary Claude Code may be
 exec'ing once a second — deploys them into the shared `$BIN_DIR` the compiled code already expects
-(`${CLAUDE_PLUGIN_DATA:-$HOME/.claude/claude-tui-line}/bin`). It registers the MCP server and the
+(`${CLAUDE_PLUGIN_DATA:-$HOME/.claude/claude-tui-line}/bin`; a plugin-snapshot install always uses
+`~/.claude/claude-tui-line/bin`). It registers the MCP server and the
 plugin as pointing at this checkout, and — with your consent, and only after taking a backup —
 points `settings.json`'s `statusLine` at the deployed binary. It reports what it changed and how to
 undo each part; see [docs/backup-ledger.md](docs/backup-ledger.md) for the statusline/config backup
@@ -94,6 +103,17 @@ reports so and writes nothing.
 If you already have a statusline script, `install.sh` backs it up before replacing it — see
 [docs/backup-ledger.md](docs/backup-ledger.md). Installing as a plugin instead also gets you
 `/claude-tui-line:migrate`, which does the same backup and maps your script's elements onto items.
+
+### Uninstall
+
+1. `/claude-tui-line:revert`
+2. `claude mcp remove -s user claude-tui-line`
+3. `claude plugin uninstall claude-tui-line@claude-tui-line`
+4. Optionally delete `~/.claude/claude-tui-line` — this deletes the backups too, so only after
+   step 1.
+
+Uninstalling the plugin alone leaves the statusline and MCP server working from
+`~/.claude/claude-tui-line/bin`.
 
 ## Configuration
 

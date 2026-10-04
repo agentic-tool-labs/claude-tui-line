@@ -8,29 +8,52 @@ Work through these steps in order. **Stop and report** at the first one that fai
 carrying on — a half-installed statusline is worse than none, because Claude Code will run a
 broken command once a second.
 
-## 1. Run install.sh
-
-```bash
-"${CLAUDE_PLUGIN_ROOT}/install.sh"
-```
+## 1. Plan, approve, apply
 
 This is the one implementation of the install — toolchain check, both builds, the backup ledger
-entry, the `settings.json` write, and MCP/plugin registration all live there, not here. Run it and
-watch its own prompts: it asks per action class (build, deploy, statusline rewrite, registration)
-before writing anything, and it never edits `settings.json` without appending a ledger entry first.
+entry, the `settings.json` write, and MCP registration all live in `install.sh`, not here. Relay
+what it says; do not re-derive it.
 
-**This requires a locally-sourced plugin — a git checkout, not a marketplace-synced snapshot.**
-`${CLAUDE_PLUGIN_ROOT}` points at a snapshot when the plugin came from a marketplace, and
-`install.sh` refuses to run against one (it would register the snapshot itself, which the next sync
-overwrites). If it refuses for this reason, **show the user its refusal message verbatim** rather
-than reinterpreting it — it names the actual checkout to run `install.sh` from instead.
+Your Bash tool has no terminal, so install.sh cannot prompt. It is run twice instead: once to
+plan, once to apply what the user approved.
 
-If it exits non-zero, show the user its output and stop — do not retry pieces of it by hand or
-re-derive what it does in prose.
+1. **Plan.** Run:
 
-If it succeeds, relay what it printed:
+   ```bash
+   "${CLAUDE_PLUGIN_ROOT}/install.sh" --dry-run
+   ```
 
-- which directory the binaries went to
+   If it exits non-zero, show the user its output verbatim and stop. A missing toolchain lands
+   here with install.sh's own message and download URL.
+
+2. **Already installed.** If the output contains `already installed`, say nothing was changed and
+   skip to section 2 (Show the user what they will get).
+
+3. **Approve.** Otherwise show the plan lines (everything after `this run would have:`) verbatim
+   and ask with **AskUserQuestion** whether to apply exactly that plan — options Apply / Cancel.
+   If the plan contains the `rewritten settings.json statusLine` line, the question text must
+   quote it. Cancel: stop; nothing was written.
+
+4. **Apply.** Run:
+
+   ```bash
+   "${CLAUDE_PLUGIN_ROOT}/install.sh" --non-interactive
+   ```
+
+   If it exits non-zero, show the user its output and stop — do not retry pieces of it by hand.
+
+If the output says the marketplace source is the user's checkout and that it is handing off, the
+checkout's own install.sh did the work; say so and name the checkout.
+
+An older checkout whose install.sh predates `--dry-run` fails step 1 with `unrecognized argument`;
+tell the user to update the checkout.
+
+When it succeeds, relay what it printed:
+
+- which mode ran: plugin snapshot, git checkout, or handoff to the checkout it named
+- which directory the binaries went to. In snapshot mode that is `~/.claude/claude-tui-line/bin`,
+  outside the plugin, so it survives plugin updates — **after a plugin update, run
+  `/claude-tui-line:setup` again to rebuild**. A notice at session start says when that is due.
 - the ledger entry kind it appended (`origin` or `checkpoint`) and the backup path — and if it was
   a `checkpoint` rather than an `origin`, say so explicitly (see step 3 below for why that matters)
 - whether it registered the MCP server and the plugin, or left either alone
