@@ -90,6 +90,14 @@ public static class ItemRegistry
             ctx => SegmentBuilder.BuildLinear(ctx.GitBranch),
             ItemColorKind.Decorative,
             DefaultLinkTemplate: ctx => LinearDefaultLink(ctx)),
+        new("ah", "agent-hierarchy status for this repo's live teams — live members, work out, and blocked/overdue/stalled counts — read from .claude/hierarchy/status.json, which agent-hierarchy keeps current; hidden in the sessions of live team members",
+            ctx => SegmentBuilder.ResolveAh(ctx, useShort: false),
+            ctx => SegmentBuilder.BuildAh(ctx, useShort: false, ctx.ItemSettings?.Ah),
+            ItemColorKind.Semantic),
+        new("ah-short", "an abbreviated ah status, for panes too narrow for the full one",
+            ctx => SegmentBuilder.ResolveAh(ctx, useShort: true),
+            ctx => SegmentBuilder.BuildAh(ctx, useShort: true, ctx.ItemSettings?.AhShort),
+            ItemColorKind.Semantic),
     };
 
     // The number comes straight from PrInfo.Number, never from ResolvePullRequest's rendered value,
@@ -210,8 +218,10 @@ public static class ItemRegistry
     // whole-statusline assertions in SegmentBuilderTests.cs for no benefit. autocompact is excluded
     // per SPEC-102-showlabel-and-autocompact.md §B.3: a new item must not silently appear in every
     // existing user's statusline.
+    // ah and ah-short are opt-in for the same reason as autocompact, and because placing one costs a
+    // file read.
     public static readonly IReadOnlyList<string> DefaultIds =
-        Items.Where(i => i.Id is not ("model-short" or "remote-url" or "repo-host" or "linear" or "autocompact"))
+        Items.Where(i => i.Id is not ("model-short" or "remote-url" or "repo-host" or "linear" or "autocompact" or "ah" or "ah-short"))
             .Select(i => i.Id)
             .ToList();
 

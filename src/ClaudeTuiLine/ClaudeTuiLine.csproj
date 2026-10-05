@@ -12,7 +12,7 @@
     <OptimizationPreference>Speed</OptimizationPreference>
     <AssemblyName>claude-tui-line</AssemblyName>
     <RootNamespace>ClaudeTuiLine</RootNamespace>
-    <Version>0.5.0</Version>
+    <Version>0.6.0</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 

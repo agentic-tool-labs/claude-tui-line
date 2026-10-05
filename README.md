@@ -337,6 +337,9 @@ everything else is in the **default set** — the list you get when a pane omits
 | `remote-url` | the git remote URL *(opt-in)* |
 | `repo-host` | the host the workspace repo lives on, from the session payload *(opt-in)* |
 | `linear` | the Linear ticket id extracted from the current git branch, uppercased *(opt-in)* |
+| `autocompact` | auto-compaction state and window size *(opt-in)* |
+| `ah` | agent-hierarchy status: live, out, blocked/overdue/stalled *(opt-in)* |
+| `ah-short` | abbreviated agent-hierarchy status *(opt-in)* |
 
 `model-short`, `remote-url`, `repo-host`, and `linear` are opt-in rather than default. `remote-url`
 is opt-in because resolving it shells out to git, which you should only pay for if you asked for
@@ -382,6 +385,22 @@ is covered below, under [Linking a branch's ticket id](#linking-a-branchs-ticket
 
 These settings are per item id, not per placement: if you place the same builtin twice in a
 render, both placements see the same settings.
+
+`ah` and `ah-short` show the agent-hierarchy summary that agent-hierarchy keeps in
+`<git root>/.claude/hierarchy/status.json`. Each item has its own block, `itemSettings.ah` and
+`itemSettings.ahShort`; a key set in one never affects the other. Both take `showLabel` (default
+`true`), `labelColor` (default none: the whole item takes the tone colour) and `stateColors` with
+`work`, `warn`, `bad` and `idle` (defaults blue, yellow, red, grey; an unknown tone uses `idle`).
+An invalid colour falls back to the default, and `--check` reports it.
+
+```json
+{ "itemSettings": { "ah": { "labelColor": "grey" }, "ahShort": { "showLabel": false, "stateColors": { "bad": "magenta" } } } }
+```
+
+The item shows nothing when there is no status file or it is unusable, when the current entry is
+not visible, or when the session is listed in the file's `member_sessions`. Every other session in
+the checkout sees it: the Orchestrator's session, plain sessions, and `--agent` sessions on no
+team. It costs one small file read per render, and only when an `ah` item is placed or referenced.
 
 ### Custom items
 

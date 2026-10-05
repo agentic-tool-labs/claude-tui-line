@@ -31,12 +31,22 @@ public sealed class ItemContext
     /// </summary>
     public string? RemoteUrl => _remoteUrl.Value;
 
-    public ItemContext(StatusInput input, string? gitBranch, EngramProbeResult? engram, Func<string?> remoteUrlProbe, ItemSettingsJsonConfig? itemSettings = null)
+    private readonly Lazy<HierarchyEntry?> _hierarchy;
+
+    /// <summary>
+    /// The agent-hierarchy status entry that is current now, read at most once per render and only
+    /// when an ah item reads it. Null when no probe was supplied, so contexts built without one
+    /// never touch the filesystem.
+    /// </summary>
+    public HierarchyEntry? Hierarchy => _hierarchy.Value;
+
+    public ItemContext(StatusInput input, string? gitBranch, EngramProbeResult? engram, Func<string?> remoteUrlProbe, ItemSettingsJsonConfig? itemSettings = null, Func<HierarchyEntry?>? hierarchyProbe = null)
     {
         Input = input;
         GitBranch = gitBranch;
         Engram = engram;
         ItemSettings = itemSettings;
         _remoteUrl = new Lazy<string?>(remoteUrlProbe, System.Threading.LazyThreadSafetyMode.None);
+        _hierarchy = new Lazy<HierarchyEntry?>(hierarchyProbe ?? (() => null), System.Threading.LazyThreadSafetyMode.None);
     }
 }

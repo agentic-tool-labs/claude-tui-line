@@ -3,9 +3,9 @@ namespace ClaudeTuiLine.Tests;
 public class ItemsCommandTests
 {
     [Fact]
-    public void ItemRegistryAll_ContainsNineteenUniquelyIdentifiedItemsWithNonEmptyReports()
+    public void ItemRegistryAll_ContainsTwentyOneUniquelyIdentifiedItemsWithNonEmptyReports()
     {
-        Assert.Equal(19, ItemRegistry.All.Count);
+        Assert.Equal(21, ItemRegistry.All.Count);
         Assert.Equal(ItemRegistry.All.Count, ItemRegistry.All.Select(i => i.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count());
         Assert.All(ItemRegistry.All, i => Assert.False(string.IsNullOrWhiteSpace(i.Reports)));
     }
@@ -30,22 +30,31 @@ public class ItemsCommandTests
     }
 
     [Fact]
-    public void Build_MarksOnlyModelShortRemoteUrlRepoHostLinearAndAutocompactAsNonDefault()
+    public void Build_MarksOnlyTheOptInItemsAsNonDefault()
     {
         var result = ItemsCommand.Build();
 
         var nonDefault = result.Items.Where(i => !i.Default).Select(i => i.Id).OrderBy(id => id, StringComparer.Ordinal);
-        Assert.Equal(new[] { "autocompact", "linear", "model-short", "remote-url", "repo-host" }, nonDefault);
+        Assert.Equal(new[] { "ah", "ah-short", "autocompact", "linear", "model-short", "remote-url", "repo-host" }, nonDefault);
     }
 
     [Fact]
-    public void Build_MarksContextRateLimitsAndEngramAsSemanticAndEverythingElseDecorative()
+    public void Build_MarksContextRateLimitsEngramAndTheAhItemsAsSemanticAndEverythingElseDecorative()
     {
         var result = ItemsCommand.Build();
 
         var semantic = result.Items.Where(i => i.Color == "semantic").Select(i => i.Id).OrderBy(id => id, StringComparer.Ordinal);
-        Assert.Equal(new[] { "context", "engram", "rate-limits" }, semantic);
+        Assert.Equal(new[] { "ah", "ah-short", "context", "engram", "rate-limits" }, semantic);
         Assert.All(result.Items.Where(i => i.Color != "semantic"), i => Assert.Equal("decorative", i.Color));
+    }
+
+    [Fact]
+    public void Build_RendersTheAhItemsFromTheCannedWarnEntry()
+    {
+        var result = ItemsCommand.Build();
+
+        Assert.Equal("ah: 2 live · 1 out · 1 blocked", result.Items.Single(i => i.Id == "ah").Example);
+        Assert.Equal("ah: 2/1 1b", result.Items.Single(i => i.Id == "ah-short").Example);
     }
 
     [Fact]

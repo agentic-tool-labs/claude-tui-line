@@ -5617,7 +5617,7 @@ the argument for keeping worked examples few, real, and re-checked whenever the 
 reopened.
 
 `tools/check-examples.sh` now catches precisely this instance — it runs `--items --json` and
-compares. It is scoped to the eighteen builtins' default renders (§9.6.2.2), so it retires the
+compares. It is scoped to the 21 builtins' default renders (§9.6.2.2), so it retires the
 specific trap this glyph fell into without retiring the general warning above: every example
 outside that scope is still an unverified assertion, and this paragraph is still the reason to
 treat it as one.
@@ -5714,7 +5714,7 @@ Four rulings in that, none of them about formatting:
 **Once this flag exists, it is the oracle for every item example in this document — and that is
 mechanically checkable.** §9.6.2.1 says a spec example naming a specific rendered value is an
 assertion about the implementation that no document-versus-document check can verify. `--items`
-closes exactly that gap for the eighteen builtins: its `example` field is `BuildDefaultSegment` run
+closes exactly that gap for the 21 builtins: its `example` field is `BuildDefaultSegment` run
 against §9.3.1's fixture, so a check that runs `--items --json` and greps this document for
 example values that disagree is a document-versus-*code* check, which is the class §13.3's two
 checks cannot reach. It is worth building *because* the alternative already failed three times in a

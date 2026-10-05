@@ -350,7 +350,7 @@ public static class SchemaCommand
             "ItemSettingsJsonConfig",
             "Per-item settings, keyed by builtin item id.",
             Array.Empty<string>(),
-            new[] { "directory", "context", "rateLimits", "pr", "linear", "worktree", "outputStyle", "autocompact", "engram" },
+            new[] { "directory", "context", "rateLimits", "pr", "linear", "worktree", "outputStyle", "autocompact", "engram", "ah", "ahShort" },
             new[]
             {
                 Field("directory", "directoryItemSettings", "Settings for the directory item."),
@@ -362,6 +362,8 @@ public static class SchemaCommand
                 Field("outputStyle", "outputStyleItemSettings", "Settings for the output-style item."),
                 Field("autocompact", "autocompactItemSettings", "Settings for the autocompact item."),
                 Field("engram", "engramItemSettings", "Settings for the engram item."),
+                Field("ah", "ahItemSettings", "Settings for the ah item."),
+                Field("ahShort", "ahItemSettings", "Settings for the ah-short item."),
             },
             Array.Empty<string>(),
             Parse("{}")),
@@ -457,6 +459,37 @@ public static class SchemaCommand
                 "The closed field vocabulary: facts, verb, lastEventAge (no subprocess); server, version, uptime, port, pid (from `engram status --json`); lastKind, lastAge, windowCount, kind:<name> (from `engram activity --json`, case-sensitive; kind:<name> renders \"0\" when the named kind is absent from the window but the activity probe otherwise succeeded). Any other field name is a --check error.",
             },
             Parse("""{"factsColor":"cyan","verbColor":"red"}""")),
+
+        new StructureEntryJson(
+            "ahItemSettings",
+            "AhItemSettings",
+            "Settings for one agent-hierarchy status item. The ah and ah-short items each have their own block. Reading the status file costs one small file read per render, and only when an ah item is placed or referenced. Nothing runs in the background.",
+            Array.Empty<string>(),
+            new[] { "showLabel", "labelColor", "stateColors" },
+            new[]
+            {
+                Field("showLabel", "boolean", "Whether the \"ah:\" label renders before the value. Default true."),
+                Field("labelColor", "string", "Color for the \"ah:\" label only, leaving the value's color unchanged. Unset renders the whole item in the status tone's colour."),
+                Field("stateColors", "ahStateColors", "Per-tone colour overrides. A tone left unset keeps its default."),
+            },
+            Array.Empty<string>(),
+            Parse("""{"showLabel":false}""")),
+
+        new StructureEntryJson(
+            "ahStateColors",
+            "AhStateColorsJsonConfig",
+            "Colours for an ah item, by the status tone. Defaults: work blue, warn yellow, bad red, idle grey.",
+            Array.Empty<string>(),
+            new[] { "work", "warn", "bad", "idle" },
+            new[]
+            {
+                Field("work", "string", "Colour for the work tone. Default blue."),
+                Field("warn", "string", "Colour for the warn tone. Default yellow."),
+                Field("bad", "string", "Colour for the bad tone. Default red."),
+                Field("idle", "string", "Colour for the idle tone, and for any tone this version does not know. Default grey."),
+            },
+            Array.Empty<string>(),
+            Parse("""{"bad":"magenta"}""")),
 
         new StructureEntryJson(
             "engramField",

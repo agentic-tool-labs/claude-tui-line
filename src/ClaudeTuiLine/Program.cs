@@ -75,7 +75,8 @@ static async Task<int> RunAsync(string? explicitConfigPath = null)
             gitBranch = null;
         }
 
-        var ctx = new ItemContext(input, gitBranch, engram, () => RemoteUrl.Probe(input.Cwd, ItemCache.ResolveCacheDir()), topLevel.ItemSettings);
+        var ctx = new ItemContext(input, gitBranch, engram, () => RemoteUrl.Probe(input.Cwd, ItemCache.ResolveCacheDir()), topLevel.ItemSettings,
+            () => HierarchyStatus.Probe(input.Cwd, input.SessionId, DateTimeOffset.UtcNow));
 
         var columnsEnv = Environment.GetEnvironmentVariable("COLUMNS");
 
@@ -362,7 +363,8 @@ static async Task<int> RunPreview(bool json, string? explicitConfigPath, int? co
             gitBranch = null;
         }
 
-        ctx = new ItemContext(input, gitBranch, engram, () => RemoteUrl.Probe(input.Cwd, ItemCache.ResolveCacheDir()), topLevel.ItemSettings);
+        ctx = new ItemContext(input, gitBranch, engram, () => RemoteUrl.Probe(input.Cwd, ItemCache.ResolveCacheDir()), topLevel.ItemSettings,
+            () => HierarchyStatus.Probe(input.Cwd, input.SessionId, DateTimeOffset.UtcNow));
     }
 
     // §9.3: --columns sets the width; absent, COLUMNS; absent that, a default of 100.
