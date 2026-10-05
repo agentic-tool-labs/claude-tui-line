@@ -418,7 +418,9 @@ Each falls back independently to the defaults: `showLabel` true, no `labelColor`
 - `tone` is never used as a colour tag. It only selects one of four keys (§C.5).
 - A `text` of `[red]x[/]` renders literally as `[red]x[/]`, and building the `Markup` does not
   throw (§E.2).
-- The file is never written, created or locked. It is read with a bounded buffer.
+- The file is never written, created or write-locked. It is read with a bounded buffer. On
+  Unix, .NET's `FileStream` takes an advisory, non-blocking shared `flock`. That is harmless:
+  the writer renames rather than locking, and a lock conflict throws and is treated as absent.
 - Rev 3: the probe never opens anything at the status path that is a symbolic link, a
   directory, or empty, and never reads from an opened file that is not seekable (§C.3). A repo
   cannot make the statusline block on a terminal, a FIFO or a device. The parent directories

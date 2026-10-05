@@ -477,7 +477,7 @@ public sealed class HierarchyStatusTests : IDisposable
         if (OperatingSystem.IsWindows()) return;
         var path = StageText("{}");
         File.Delete(path);
-        using (var mk = System.Diagnostics.Process.Start("mkfifo", path)!)
+        using (var mk = System.Diagnostics.Process.Start("mkfifo", new[] { path })!)
         {
             mk.WaitForExit();
             Assert.Equal(0, mk.ExitCode);
