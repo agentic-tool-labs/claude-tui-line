@@ -68,12 +68,12 @@ internal static class HierarchyStatus
     {
         try
         {
-            if (string.IsNullOrEmpty(cwd) || !Path.IsPathRooted(cwd))
+            if (string.IsNullOrEmpty(cwd) || !Path.IsPathFullyQualified(cwd))
             {
                 return null;
             }
 
-            for (var dir = cwd; dir is not null; dir = Path.GetDirectoryName(dir))
+            for (var dir = Path.GetFullPath(cwd); dir is not null; dir = Path.GetDirectoryName(dir))
             {
                 var git = Path.Combine(dir, ".git");
                 if (Directory.Exists(git) || File.Exists(git))

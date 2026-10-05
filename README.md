@@ -341,7 +341,7 @@ everything else is in the **default set** — the list you get when a pane omits
 | `ah` | agent-hierarchy status: live, out, blocked/overdue/stalled *(opt-in)* |
 | `ah-short` | abbreviated agent-hierarchy status *(opt-in)* |
 
-`model-short`, `remote-url`, `repo-host`, and `linear` are opt-in rather than default. `remote-url`
+`model-short`, `remote-url`, `repo-host`, `linear`, `autocompact`, `ah`, and `ah-short` are opt-in rather than default. `remote-url`
 is opt-in because resolving it shells out to git, which you should only pay for if you asked for
 it. `repo-host` costs nothing to resolve — it's excluded because a bare hostname is noise in a
 rendered statusline; its purpose is to be referenced from a `link` template, not displayed on its

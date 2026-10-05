@@ -132,8 +132,7 @@ public sealed class HierarchyStatusTests : IDisposable
         var plain = RenderPlain("ah", Ctx(path, T0, "sess-orch"), 13, out var markup);
 
         Assert.True(plain.Length <= 13);
-        Assert.StartsWith("ah: 2 live ", plain);
-        Assert.EndsWith("…", plain);
+        Assert.Equal("ah: 2 live ·…", plain);
         Assert.Contains("[red]", markup);
     }
 
@@ -447,6 +446,15 @@ public sealed class HierarchyStatusTests : IDisposable
     {
         var config = JsonSerializer.Deserialize($"{{\"itemSettings\":{{\"{key}\":{blockJson}}}}}", ConfigJsonContext.Default.UserConfig)!;
         return ConfigChecker.Check(config).ToList();
+    }
+
+    [Fact]
+    public void Check_HyphenatedItemId_IsUnknownKeyWithSuggestion()
+    {
+        var config = JsonSerializer.Deserialize("""{"itemSettings":{"ah-short":{}}}""", ConfigJsonContext.Default.UserConfig)!;
+        var d = Assert.Single(ConfigChecker.Check(config), x => x.Code == "unknown-key");
+        Assert.Equal("/itemSettings/ah-short", d.Path);
+        Assert.Contains("did you mean 'ahShort'", d.Message);
     }
 
     [Theory]
