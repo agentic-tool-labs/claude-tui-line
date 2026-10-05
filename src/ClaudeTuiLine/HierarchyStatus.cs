@@ -108,23 +108,37 @@ internal static class HierarchyStatus
             return null;
         }
 
-        var buffer = new byte[MaxBytes + 1];
-        var length = 0;
+        // Judged on the path itself (a final symlink is not followed): git can store a symlink to
+        // /dev/tty or a FIFO, and opening or reading either would block the statusline.
+        var info = new FileInfo(path);
+        if (info.LinkTarget is not null || !info.Exists || info.Length == 0)
+        {
+            return null;
+        }
+
+        byte[] buffer;
         using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
         {
+            if (!stream.CanSeek || stream.Length is 0 or > MaxBytes)
+            {
+                return null;
+            }
+
+            buffer = new byte[stream.Length];
+            var length = 0;
             int n;
             while (length < buffer.Length && (n = stream.Read(buffer, length, buffer.Length - length)) > 0)
             {
                 length += n;
             }
+
+            if (length < buffer.Length)
+            {
+                Array.Resize(ref buffer, length);
+            }
         }
 
-        if (length > MaxBytes)
-        {
-            return null;
-        }
-
-        var doc = JsonSerializer.Deserialize(buffer.AsSpan(0, length), HierarchyStatusJsonContext.Default.HierarchyStatusDoc);
+        var doc = JsonSerializer.Deserialize(buffer, HierarchyStatusJsonContext.Default.HierarchyStatusDoc);
         if (doc is null
             || doc.Schema != 1
             || doc.ExpiresAt is not { } expiresAt || now >= expiresAt

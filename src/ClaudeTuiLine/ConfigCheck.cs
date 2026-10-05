@@ -1483,12 +1483,22 @@ public static class ConfigChecker
             {
                 yield return (ahSettings.Extra, ConfigJsonContext.Default.AhItemSettings,
                     "the ah item's settings", "/itemSettings/ah");
+                if (ahSettings.StateColors is { } ahSettingsStateColors)
+                {
+                    yield return (ahSettingsStateColors.Extra, ConfigJsonContext.Default.AhStateColorsJsonConfig,
+                        "the ah item's stateColors", "/itemSettings/ah/stateColors");
+                }
             }
 
             if (itemSettings.AhShort is { } ahShortSettings)
             {
                 yield return (ahShortSettings.Extra, ConfigJsonContext.Default.AhItemSettings,
                     "the ah-short item's settings", "/itemSettings/ahShort");
+                if (ahShortSettings.StateColors is { } ahShortSettingsStateColors)
+                {
+                    yield return (ahShortSettingsStateColors.Extra, ConfigJsonContext.Default.AhStateColorsJsonConfig,
+                        "the ah-short item's stateColors", "/itemSettings/ahShort/stateColors");
+                }
             }
         }
 

@@ -1,11 +1,14 @@
 # SPEC-106 — `ah` and `ah-short` items: agent-hierarchy status
 
-- **Status:** rev 2. Ready for implementation. No contract or user question is open. One measurement is still open (E7, §F.2), and it is run after the code lands.
+- **Status:** rev 3. Ready for implementation. No contract or user question is open. One measurement is still open (E7, §F.2), and it is run after the code lands.
 - **Author:** Architect
 - **Request:** `20261005-034321-ogef` (spec-106-ah-status-items), from the claude-tui-line-orchestrator.
   Rev 2 is amendment request `20261005-090048-13hl`. It folds in the upstream answers to CQ1–CQ6
   (agent-tools Architect, `0071` r3.12) and the user's decisions U1 and U2. §D.4 lists every
   section that changed.
+  Rev 3 is amendment request `20261005-140139-4qr7`. It rules on review `20261005-105037-1qhl`:
+  finding 1 (a symlinked or non-regular `status.json` can block the read), nits 4 and 6, and the
+  read buffer's size. §D.5 lists every section that changed.
 - **Upstream contract:** agent-tools spec 0071, Phase 2a. That spec's section 7 is the contract this one
   satisfies. The status-file format belongs to `ah`, so this repo does not edit it. Paths (local
   only):
@@ -191,15 +194,17 @@ Inputs: the located path, the viewing session id (`StatusInput.SessionId`), and 
 inside the probe yields null. A catch-all at the probe boundary is intended here: a sidecar file
 must never break the statusline.
 
-The document is **absent** (null) when any of these holds. This list is exact: CQ4 and CQ5
-settled it upstream (rev 2).
+The document is **absent** (null) when any of these holds. The field rows are exact: CQ4 and
+CQ5 settled them upstream (rev 2). The file rows are this reader's reading of "unreadable" (rev 3).
 
 | condition | note |
 |---|---|
-| no file located, file missing or unreadable | includes a path that is a directory |
-| size > 262,144 bytes | Exactly 262,144 is read. The size is checked **before** parsing: read at most 262,145 bytes, and if more than 262,144 were actually read, the doc is absent and is never parsed. A `stat` may serve as an early-out, but the bounded read decides. |
+| no file located, or nothing exists at the path | |
+| the path is not a non-empty regular file, judged **before opening it** and **without following a final symbolic link**: it is a directory, a symbolic link (to anything: a valid file, a directory, a device, or nothing), or its size is 0 | Rev 3. Git can store a symlink, so a hostile repo can commit `status.json` → `/dev/tty` (reading blocks on, and consumes, terminal input) or → a FIFO (`open(2)` blocks). FIFOs, sockets and device nodes report size 0, so the size-0 rule keeps `open` from blocking on one placed directly at the path. An empty regular file is invalid JSON anyway, so no valid document is lost. `ah` writes by rename, so a real `status.json` is never a symlink. **Only the final component is judged:** parent directories may be symlinks (macOS `/tmp` and `/var` are), and the check must not resolve or reject them. |
+| the open fails, or the opened file is not seekable | A FIFO that gets past the pre-open check (a race, or a FIFO with a writer attached) is not seekable, so its size cannot be taken from the handle. It is never read. |
+| size > 262,144 bytes | Exactly 262,144 is read. The size is the **opened file's own length, taken from the open handle**, and it is checked before any byte is read or parsed. Rev 3: the read buffer is exactly that size, and the read stops at that size or at end of file, whichever comes first; the bytes actually read are parsed. A size taken from the path before opening may serve as an early-out, but the handle's size decides, because `ah` replaces the file by rename and the path can name a newer file by the time it is opened. A file changed in place mid-read (`ah` never does this) yields torn bytes, which fail to parse and so are absent. |
 | not valid JSON | |
-| `schema` missing, not a JSON number, or ≠ `1` | e.g. `"schema": "1"`; `schema: 2` is absent by contract |
+| `schema` missing, not a JSON number, ≠ `1`, or not written as the integer `1` | e.g. `"schema": "1"`; `schema: 2` is absent by contract. Rev 3 (nit 4): `1.0` and `1e0` are absent too. This is stricter than numeric equality, deliberately: `ah`'s writer only ever emits `1`, the reader may hold `schema` as an integer, and the strictness fails toward hidden. |
 | `expires_at` missing, not a string, not ISO-8601, or `now ≥ expires_at` | equality counts as expired |
 | `member_sessions` missing, not an array, or any element not a string | Missing is **absent, not empty**: it fails toward showing nothing. An empty array `[]` is valid. |
 | `timeline` missing, not an array, or empty | |
@@ -382,7 +387,13 @@ Each falls back independently to the defaults: `showLabel` true, no `labelColor`
     value that `ColorResolution.ResolveLiteral` rejects produces `UnknownColor` at
     `<base>/stateColors/<tone>`;
   - `labelColor`, in the same shape as the autocompact check at `ConfigCheck.cs:616-618`:
-    `UnknownColor` at `<base>/labelColor`.
+    `UnknownColor` at `<base>/labelColor`;
+  - rev 3 (nit 6, ruled in): unknown keys inside `stateColors`, such as `blocked` or `Work`, get
+    the existing `unknown-key` diagnostic. Use the same unknown-key walker registration
+    (`WalkRawObjects`) that already reports unknown keys at block level, adding the `stateColors`
+    object of each block. Without it, a typo there is ignored silently: the item keeps the
+    default colour and `--check` says nothing. Do **not** extend this to engram's `stateColors`,
+    which stays as it is.
 - **README:**
   - add two table rows under the marker at `README.md:318`. The form follows
     ``| `ah` | agent-hierarchy status: live, out, blocked/overdue/stalled *(opt-in)* |`` and
@@ -408,6 +419,15 @@ Each falls back independently to the defaults: `showLabel` true, no `labelColor`
 - A `text` of `[red]x[/]` renders literally as `[red]x[/]`, and building the `Markup` does not
   throw (§E.2).
 - The file is never written, created or locked. It is read with a bounded buffer.
+- Rev 3: the probe never opens anything at the status path that is a symbolic link, a
+  directory, or empty, and never reads from an opened file that is not seekable (§C.3). A repo
+  cannot make the statusline block on a terminal, a FIFO or a device. The parent directories
+  are not checked, and this is deliberate: a repo cannot create a FIFO or device named
+  `status.json` elsewhere on the disk for a parent symlink to reach.
+- Rev 3, accepted ceiling: the pre-open check and the open are two steps. A process running
+  as the user that swaps the file for a FIFO between them can still block one render. That
+  process already controls the account. Closing the gap needs an `O_NOFOLLOW | O_NONBLOCK` open
+  through P/Invoke, which this spec does not add.
 
 ### C.9 Narrow widths (`0071 §7.5`)
 
@@ -443,6 +463,17 @@ Each falls back independently to the defaults: `showLabel` true, no `labelColor`
   with no p95 and no config override, and `publish/` is off limits. §F.2 therefore runs the same
   calibrated hyperfine discipline directly and leaves `bench.sh` untouched. Upstream accepted
   this, with conditions (CQ6); §F.2 carries them.
+- **Rev 3: the read requires a non-empty regular file, not merely a non-symlink.** "Not a
+  symlink" alone closes the hostile-repo route, because git stores only regular files and
+  symlinks. A FIFO placed locally would still block `open`, though. .NET has no public pre-open
+  "is a regular file" test on Unix. The behaviour is reached with what it does report: the path's
+  own metadata (link flag, directory, size 0) before opening, then seekability and length on
+  the handle. Every rule fails toward hidden, and no valid document is ever rejected by them.
+- **Rev 3: the buffer is the opened file's exact size.** The fixed 262,145-byte buffer was a
+  large-object allocation, zeroed on every render, to read a document that is usually under
+  8 KB. Sizing from the handle makes the per-render cost proportional to the file and obviously
+  small, without needing a measurement. `ArrayPool` is not used: a process that renders once
+  starts with an empty pool, so renting buys nothing.
 
 ### D.2 User decisions (settled, rev 2)
 
@@ -483,6 +514,25 @@ Each falls back independently to the defaults: `showLabel` true, no `labelColor`
   - a present-path sanity check runs before timing;
   - p50 and p95 per arm;
   - over 1 ms, the split is read/parse/render with named arms: §F.2.
+
+### D.5 Rev 3 change list (review `20261005-105037-1qhl`)
+
+- **Finding 1, non-regular file (spec-defect):** §C.3 absent table, two new file rows. The path
+  must be a non-empty regular file, judged before opening without following a final symlink.
+  An opened file that is not seekable is never read. §C.8 states the guarantee and the race
+  ceiling, §D.1 the rationale, §E.2 the tests, and §I the risks.
+- **Buffer:** §C.3 size row. The size comes from the open handle, and the buffer is exactly that
+  size. This replaces the fixed 262,145-byte buffer. The CQ5 boundary is unchanged, and so are
+  its tests.
+- **Nit 4, ruled in as documentation only:** §C.3 `schema` row. The integer `1` only; `1.0` and
+  `1e0` are absent. Behaviour is unchanged. One §E.2 case pins it.
+- **Nit 6, ruled in:** §C.7 `ConfigCheck`. Unknown keys under each block's `stateColors` are
+  reported. One §E.4 case per block covers it.
+- §E.4: the "unverified assumption" about `itemSettings["ah-short"]` is replaced by the
+  review's verification that the condition holds.
+- §F.2: a note on waiving E7.
+- Not changed: findings 2, 3, 5 and 8 are implementation defects, already routed to the
+  Implementor. Nit 7 is out of scope (§H keeps `LabeledSegment` unchanged).
 
 ---
 
@@ -561,7 +611,25 @@ Unless stated, each case below is `work.json` with one change, at `now = T0`.
   so the picked first entry is itself well formed; every `at` is checked;
 - picked entry (`now = T0`, so the first entry): `visible` removed; `"visible": "true"`; `tone`
   removed; `"tone": 5`; `text` removed; `"short": null`. Each makes **both** items hidden;
-- a valid document padded with trailing spaces to **262,145** bytes.
+- a valid document padded with trailing spaces to **262,145** bytes;
+- `"schema": 1.0` (rev 3, nit 4);
+- rev 3, non-regular file at the status path (Unix only; on Windows these cases do not run.
+  Use the test project's existing platform-conditional convention, or an early return if it
+  has none):
+  - `status.json` is a **symbolic link to a valid copy of `work.json`** elsewhere in the temp
+    dir → absent. The target is valid, so only the link rule can make it absent;
+  - `status.json` is a dangling symbolic link → absent;
+  - `status.json` is a **FIFO** with no writer → absent, and the call **returns**. Run the call
+    under a bounded wait of at most 5 s. A timeout fails the test; it must never hang the
+    suite. How the FIFO is created (a libc `mkfifo` P/Invoke in the test project, or the
+    `mkfifo` tool) is the Implementor's call;
+  - **forbidden:** no test may link to, open or read `/dev/tty` or any other real device. On a
+    regression, such a test would block on, or eat, the developer's keyboard input. The
+    symlink-to-a-valid-file case already proves the link rule for every target.
+
+  The non-seekable rule (§C.3, third row) has no unit test, because staging a FIFO that gets
+  past the pre-open check is not deterministic across platforms. The Reviewer verifies it by
+  reading.
 
 **Present, and must not be absent** (CQ4: unread fields are not checked):
 - non-picked entry wrong types: the first entry's `"tone": 5` and `"visible": "yes"`, at
@@ -653,12 +721,16 @@ Each case runs for **both** blocks, `ah` and `ahShort`:
   at `/itemSettings/<key>/stateColors/work`;
 - an invalid `labelColor` → `UnknownColor` at `/itemSettings/<key>/labelColor`;
 - an unknown key under `itemSettings.<key>` → the existing `unknown-key` diagnostic;
+- rev 3 (nit 6): `itemSettings.<key>.stateColors.blocked = "red"` → the existing `unknown-key`
+  diagnostic, at the pointer the walker already produces for an unknown key
+  (`/itemSettings/<key>/stateColors/blocked`);
 - a fully valid block → no diagnostics.
 
 Also, a config with `itemSettings["ah-short"]`, the item id rather than the settings key, is
 checked as follows. If `--check` already reports unknown keys directly under `itemSettings`, pin
 that diagnostic for `ah-short`. If it does not, omit this case. Do not add detection for it.
-(Unverified assumption: whether `ItemSettingsJsonConfig` carries an `Extra` dictionary.)
+Rev 3: the review verified that the condition holds (`ItemSettingsJsonConfig.Extra` is walked,
+`ConfigCheck.cs:1444`), so this case is required.
 
 ### E.5 Existing assertions to update
 
@@ -688,6 +760,12 @@ that diagnostic for `ah-short`. If it does not, omit this case. Do not add detec
 
 **Question.** Does placing `ah` + `ah-short` against a 20 KB status file add at most 1 ms to
 render p95?
+
+**Waiving E7 (rev 3).** No design decision in this spec waits on E7. The read is a few `stat`s,
+one open, and one exact-size read of a file that is usually under 8 KB; nothing is cached, and
+nothing will be cached either way. E7 is also an acceptance item of upstream `0071`. Waiving it
+is therefore the user's call **and** must be reported to agent-tools (`at-orchestrator`). If it
+is waived, record the waiver and who agreed to it in §K instead of numbers.
 
 The method is direct hyperfine against a Release build outside `publish/`. `bench/bench.sh` is
 not used, and upstream accepted that (CQ6). These CQ6 conditions are mandatory:
@@ -836,6 +914,13 @@ Report p50 and p95 for each arm, and the four differences.
 - **Two settings blocks, one code path.** Thread the item's own block through the shared
   resolve/build and colour mapping. Do not branch on the item id inside them beyond choosing the
   field and the block.
+- **Rev 3, symlink check scope.** Judge only the final component, without following it. Code
+  that resolves the full path, or compares the full path with its real path, rejects every
+  macOS temp dir (`/var` → `/private/var`), so every §E vector test fails.
+- **Rev 3, whole-file read helpers.** A convenience "read all bytes" API that falls back to
+  reading until end of file when the length is 0 or unknown (as `File.ReadAllBytes` does)
+  reintroduces the unbounded, blocking read. The size check on the handle must sit between the
+  open and the read.
 
 ---
 
@@ -848,6 +933,12 @@ Report p50 and p95 for each arm, and the four differences.
 - The only open item is E7 (§F.2), a measurement taken after the code lands.
 - Parked outside this spec: whether `ah` should widen `member_sessions`. That is a user question
   for agent-tools, and the answer needs no change here.
+- Rev 3, for agent-tools' information (nothing here waits on it):
+  - every reader of `status.json`, the `ah` mod included, has the same symlink and FIFO hazard.
+    `status-file.md` step 1 says "unreadable" without defining it. This spec's definition
+    (§C.3) fails toward hidden;
+  - this reader treats `"schema": 1.0` as absent, which is stricter than numeric equality. The
+    writer never emits it.
 
 ---
 

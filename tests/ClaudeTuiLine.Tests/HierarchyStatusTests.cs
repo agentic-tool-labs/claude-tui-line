@@ -438,6 +438,56 @@ public sealed class HierarchyStatusTests : IDisposable
         Assert.Null(HierarchyStatus.Locate("relative/dir"));
     }
 
+    [Fact]
+    public void Read_SchemaWrittenAsFloat_IsAbsent()
+    {
+        var json = FixtureText("work").Replace("\"schema\": 1,", "\"schema\": 1.0,");
+        Assert.Contains("1.0", json);
+        Assert.Null(Read(StageText(json), T0));
+    }
+
+    [Fact]
+    public void Read_SymlinkToValidFile_IsAbsent()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var real = Path.Combine(_tmp, "real-work.json");
+        File.WriteAllText(real, FixtureText("work"));
+        var path = StageText("{}");
+        File.Delete(path);
+        File.CreateSymbolicLink(path, real);
+
+        Assert.NotNull(Read(real, T0));
+        Assert.Null(Read(path, T0));
+    }
+
+    [Fact]
+    public void Read_DanglingSymlink_IsAbsent()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var path = StageText("{}");
+        File.Delete(path);
+        File.CreateSymbolicLink(path, Path.Combine(_tmp, "nowhere.json"));
+
+        Assert.Null(Read(path, T0));
+    }
+
+    [Fact]
+    public void Read_FifoWithNoWriter_IsAbsentWithinBoundedWait()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var path = StageText("{}");
+        File.Delete(path);
+        using (var mk = System.Diagnostics.Process.Start("mkfifo", path)!)
+        {
+            mk.WaitForExit();
+            Assert.Equal(0, mk.ExitCode);
+        }
+
+        var call = Task.Run(() => Read(path, T0));
+        Assert.True(call.Wait(TimeSpan.FromSeconds(5)), "read of a FIFO did not return");
+        Assert.Null(call.Result);
+    }
+
     // ---- config check ----
 
     public static IEnumerable<object[]> Keys() => new[] { new object[] { "ah" }, new object[] { "ahShort" } };
@@ -446,6 +496,14 @@ public sealed class HierarchyStatusTests : IDisposable
     {
         var config = JsonSerializer.Deserialize($"{{\"itemSettings\":{{\"{key}\":{blockJson}}}}}", ConfigJsonContext.Default.UserConfig)!;
         return ConfigChecker.Check(config).ToList();
+    }
+
+    [Theory]
+    [MemberData(nameof(Keys))]
+    public void Check_UnknownStateColorsKey_IsUnknownKey(string key)
+    {
+        Assert.Contains(Check(key, """{"stateColors":{"blocked":"red"}}"""),
+            d => d.Code == "unknown-key" && d.Path == $"/itemSettings/{key}/stateColors/blocked");
     }
 
     [Fact]
