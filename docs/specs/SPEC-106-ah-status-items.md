@@ -1,6 +1,6 @@
 # SPEC-106 — `ah` and `ah-short` items: agent-hierarchy status
 
-- **Status:** rev 3. Ready for implementation. No contract or user question is open. One measurement is still open (E7, §F.2), and it is run after the code lands.
+- **Status:** rev 3. Implemented. No contract or user question is open. E7 (§F.2) was waived by the user (§K).
 - **Author:** Architect
 - **Request:** `20261005-034321-ogef` (spec-106-ah-status-items), from the claude-tui-line-orchestrator.
   Rev 2 is amendment request `20261005-090048-13hl`. It folds in the upstream answers to CQ1–CQ6
@@ -944,4 +944,8 @@ Report p50 and p95 for each arm, and the four differences.
 
 ## §K — Closeout
 
-*(Empty until implementation; record the E7 numbers here.)*
+- **E7 waived by the user (2026-10-05).** Not measured. The statusline refreshes about once a
+  second, so a 1 ms budget per render is immaterial, and hyperfine is not installed. No design
+  decision waited on E7 (§F.2), and nothing is cached. at-orchestrator acked the waiver for the
+  upstream `0071` acceptance item.
+- Implementation: `b55a51d` (items), `b618809` (review fixes), `a158f95` (rev 3 read hardening).
