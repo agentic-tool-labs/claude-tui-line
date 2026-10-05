@@ -12,6 +12,14 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
+# A plugin snapshot is any copy under the plugins dir; Claude Code rewrites it on
+# update, so nothing persisted may point into it. Decided from REPO_ROOT alone,
+# before BIN_DIR: CLAUDE_PLUGIN_DATA is deleted on plugin uninstall, so snapshot
+# builds pin BIN_DIR to the home directory by dropping it.
+case "$REPO_ROOT" in
+  "$HOME/.claude/plugins/"*) MODE=snapshot; unset CLAUDE_PLUGIN_DATA ;;
+  *) MODE=clone ;;
+esac
 BIN_DIR="${CLAUDE_PLUGIN_DATA:-$HOME/.claude/claude-tui-line}/bin"
 STAGE_DIR="$REPO_ROOT/publish"
 STAGE_MCP_DIR="$REPO_ROOT/publish-mcp"
@@ -20,6 +28,7 @@ LEDGER="$LEDGER_DIR/ledger.jsonl"
 SETTINGS="$HOME/.claude/settings.json"
 CONFIG="${CLAUDE_TUI_LINE_CONFIG:-$HOME/.claude/claude-tui-line.json}"
 MCP_WRAPPER="$REPO_ROOT/bin/claude-tui-line-mcp"
+PLUGIN_JSON="$REPO_ROOT/.claude-plugin/plugin.json"
 MCP_SCOPE="user"
 PLUGIN_SCOPE="user"
 
@@ -28,14 +37,18 @@ stage_mcp="$STAGE_MCP_DIR/claude-tui-line-mcp"
 cli_bin="$BIN_DIR/claude-tui-line"
 mcp_bin="$BIN_DIR/claude-tui-line-mcp"
 target_status_line="$cli_bin"
+STAMP="$BIN_DIR/.plugin-version"
+if [[ "$MODE" == "snapshot" ]]; then MCP_TARGET="$mcp_bin"; else MCP_TARGET="$MCP_WRAPPER"; fi
 
 NON_INTERACTIVE=0
+DRY_RUN=0
 ALLOW_MARKETPLACE_REPLACE=0
 for arg in "$@"; do
   case "$arg" in
     --non-interactive) NON_INTERACTIVE=1 ;;
+    --dry-run) DRY_RUN=1 ;;
     --allow-marketplace-replace) ALLOW_MARKETPLACE_REPLACE=1 ;;
-    -h|--help) echo "Usage: $0 [--non-interactive] [--allow-marketplace-replace]"; exit 0 ;;
+    -h|--help) echo "Usage: $0 [--non-interactive] [--dry-run] [--allow-marketplace-replace]"; exit 0 ;;
     *) echo "install.sh: unrecognized argument: $arg" >&2; exit 2 ;;
   esac
 done
@@ -62,7 +75,38 @@ confirm() {
 }
 
 marketplace_block() {
-  claude plugin marketplace list 2>&1 | awk '/claude-tui-line$/{f=1} f{print} f&&/Source:/{exit}' || true
+  claude plugin marketplace list 2>&1 | awk '!f{l=$0; sub(/^[ \t]*(❯[ \t]*)?/,"",l); sub(/[ \t\r]*$/,"",l); if(l=="claude-tui-line")f=1} f{print} f&&/Source:/{exit}' || true
+}
+
+# The CLI labels a local marketplace "Folder"; older CLIs say "Directory". This
+# is the one place that knows either label.
+marketplace_local_path() {
+  printf '%s\n' "$1" | sed -nE 's/^ *Source: (Folder|Directory) \((.*)\)[^)]*$/\2/p' | awk 'NR==1'
+}
+
+marketplace_is_repo() {
+  [[ "$(marketplace_local_path "$1")" == "$REPO_ROOT" ]]
+}
+
+plugin_version() {
+  jq -r '.version // empty' "$PLUGIN_JSON" 2>/dev/null || true
+}
+
+print_plan() {
+  info "this run would have:"
+  [[ "$c1_ok" != "1" || "$c2_ok" != "1" || "$c7_ok" != "1" ]] && info "  - built and deployed claude-tui-line and claude-tui-line-mcp into $BIN_DIR"
+  [[ "$c4_ok" != "1" ]] && info "  - chmod +x $MCP_WRAPPER"
+  [[ "$c5_ok" != "1" ]] && info "  - rewritten settings.json statusLine from '${current_status_line:-<none>}' to $target_status_line"
+  if [[ "$c6_mcp_ok" != "1" ]]; then
+    if [[ "$MODE" == "snapshot" ]]; then
+      info "  - registered the MCP server (claude mcp add -s $MCP_SCOPE, at $MCP_TARGET)"
+    else
+      info "  - registered the MCP server (claude mcp add -s $MCP_SCOPE)"
+    fi
+  fi
+  [[ "$c6_plugin_ok" != "1" ]] && info "  - registered the plugin as a local checkout ($REPO_ROOT)"
+  [[ "$c3_ok" != "1" ]] && info "  - (and .mcp.json needs a by-hand fix — install.sh will not touch it)"
+  return 0
 }
 
 do_build() {
@@ -131,6 +175,25 @@ do_deploy() {
   chmod +x "$tmp"
   mv -f "$tmp" "$mcp_bin"
   pass "deployed claude-tui-line-mcp -> $mcp_bin"
+
+  # The stamp means "these binaries were built from a plugin snapshot". It is
+  # written last so a failed deploy leaves the old stamp and the next run
+  # rebuilds; a clone deploy removes it so the SessionStart hook stays silent for
+  # clone users, whose plugin cache can lag their checkout.
+  if [[ "$MODE" == "snapshot" ]]; then
+    local ver
+    ver=$(plugin_version)
+    if [[ -n "$ver" ]]; then
+      tmp="$BIN_DIR/.plugin-version.tmp.$$"
+      printf '%s\n' "$ver" > "$tmp"
+      mv -f "$tmp" "$STAMP"
+    else
+      rm -f "$STAMP"
+      warn "$PLUGIN_JSON has no version — no snapshot stamp written, the next snapshot run will rebuild"
+    fi
+  else
+    rm -f "$STAMP"
+  fi
 
   if [[ ! -x "$cli_bin" || ! -x "$mcp_bin" ]]; then
     fail "deploy reported success but $BIN_DIR binaries are missing or not executable"
@@ -223,25 +286,44 @@ echo "claude-tui-line — install"
 echo
 
 # ---------------------------------------------------------------------------
-# Phase 1: validate — read-only, may abort freely. §4.4's snapshot refusal
-# comes first, before any git or claude call.
+# Phase 1: validate — read-only, may abort freely. Mode detection and the
+# handoff to a local clone come first, before any toolchain check.
 # ---------------------------------------------------------------------------
 
 echo "1. Checkout sanity"
-case "$REPO_ROOT" in
-  "$HOME/.claude/plugins/"*)
-    fail "install.sh is running from a synced plugin snapshot ($REPO_ROOT), not a git checkout"
-    info "a snapshot is overwritten by the next marketplace sync — run ./install.sh from your actual git clone instead"
+if [[ "$MODE" == "snapshot" ]]; then
+  pass "running from a plugin snapshot at $REPO_ROOT"
+  info "nothing persisted will reference this directory — binaries go to $BIN_DIR"
+else
+  if [[ ! -e "$REPO_ROOT/.git" ]]; then
+    fail "$REPO_ROOT has no .git — this does not look like a git checkout"
+    info "run ./install.sh from your actual git clone instead"
     exit 1
-    ;;
-esac
-if [[ ! -e "$REPO_ROOT/.git" ]]; then
-  fail "$REPO_ROOT has no .git — this does not look like a git checkout"
-  info "run ./install.sh from your actual git clone instead"
-  exit 1
+  fi
+  pass "running from a git checkout at $REPO_ROOT"
 fi
-pass "running from a git checkout at $REPO_ROOT"
 echo
+
+# A snapshot installed from a local-clone marketplace would build the (possibly
+# stale) cached copy over the clone's binaries, so the clone's own install.sh
+# does the work instead. The clone is not under the plugins dir, so it cannot
+# hand off again.
+if [[ "$MODE" == "snapshot" ]] && command -v claude >/dev/null 2>&1; then
+  handoff_path=$(marketplace_local_path "$(marketplace_block)")
+  if [[ -n "$handoff_path" ]]; then
+    handoff_why=""
+    if [[ "$handoff_path" != /* ]]; then handoff_why="the path is not absolute"
+    elif [[ "$handoff_path" == "$HOME/.claude/plugins/"* ]]; then handoff_why="it is itself under the plugins directory"
+    elif [[ ! -e "$handoff_path/.git" ]]; then handoff_why="it has no .git"
+    elif [[ ! -x "$handoff_path/install.sh" ]]; then handoff_why="its install.sh is missing or not executable"
+    fi
+    if [[ -z "$handoff_why" ]]; then
+      info "marketplace source is your checkout $handoff_path — handing off to $handoff_path/install.sh"
+      exec "$handoff_path/install.sh" "$@"
+    fi
+    info "marketplace source $handoff_path is not a usable checkout ($handoff_why) — continuing from the snapshot"
+  fi
+fi
 
 echo "2. Toolchain"
 if ! dotnet_version=$(dotnet --version 2>/dev/null); then
@@ -292,9 +374,30 @@ elif [[ -x "$mcp_bin" ]]; then
 else
   fail "claude-tui-line-mcp missing or not executable at $mcp_bin"
 fi
-if [[ -x "$MCP_WRAPPER" ]]; then c4_ok=1; pass "$MCP_WRAPPER is executable"; else warn "$MCP_WRAPPER is not executable (fresh clones land it this way)"; fi
+if [[ "$MODE" == "snapshot" ]]; then
+  c4_ok=1
+  info "MCP wrapper not used in snapshot mode — the server runs the deployed $mcp_bin"
+elif [[ -x "$MCP_WRAPPER" ]]; then c4_ok=1; pass "$MCP_WRAPPER is executable"; else warn "$MCP_WRAPPER is not executable (fresh clones land it this way)"; fi
 
-if [[ "$c1_ok" == "1" ]]; then
+if [[ "$c1_ok" == "1" && "$MODE" == "snapshot" ]]; then
+  stamp_ver=$(tr -d '[:space:]' 2>/dev/null < "$STAMP" || true)
+  plugin_ver=$(plugin_version)
+  if [[ -z "$plugin_ver" ]]; then
+    c7_ok=0
+    warn "plugin.json has no version — cannot tell whether the binaries are current, rebuild recommended"
+  elif [[ -z "$stamp_ver" ]]; then
+    c7_ok=0
+    warn "no readable snapshot stamp at $STAMP — rebuild recommended"
+  elif [[ "$stamp_ver" != "$plugin_ver" ]]; then
+    c7_ok=0
+    warn "binaries were built from plugin $stamp_ver but this snapshot is $plugin_ver — rebuild recommended"
+  else
+    pass "binaries match plugin version $plugin_ver"
+  fi
+elif [[ "$c1_ok" == "1" && -e "$STAMP" ]]; then
+  c7_ok=0
+  warn "binaries were built from a plugin snapshot, not this checkout — rebuild recommended"
+elif [[ "$c1_ok" == "1" ]]; then
   commit_epoch=$(git -C "$REPO_ROOT" log -1 --format=%ct 2>/dev/null) || commit_epoch=""
   bin_epoch=$(mtime_epoch "$cli_bin" 2>/dev/null) || bin_epoch=""
   if [[ -n "$commit_epoch" && -n "$bin_epoch" ]]; then
@@ -371,17 +474,22 @@ else
   printf '%s\n' "$mcp_matches" | while IFS= read -r line; do info "  $line"; done
 fi
 
-block=$(marketplace_block)
 c6_plugin_ok=0
-if [[ -n "$block" ]]; then
-  if echo "$block" | grep -Fq "Source: Directory ($REPO_ROOT)"; then
-    c6_plugin_ok=1
-    pass "plugin marketplace: local checkout ($REPO_ROOT)"
-  else
-    fail "plugin marketplace: $(echo "$block" | grep 'Source:' | sed 's/^ *//')"
-  fi
+if [[ "$MODE" == "snapshot" ]]; then
+  c6_plugin_ok=1
+  pass "plugin: running from the installed snapshot, so it is registered"
 else
-  fail "plugin marketplace: claude-tui-line not registered"
+  block=$(marketplace_block)
+  if [[ -n "$block" ]]; then
+    if marketplace_is_repo "$block"; then
+      c6_plugin_ok=1
+      pass "plugin marketplace: local checkout ($REPO_ROOT)"
+    else
+      fail "plugin marketplace: $(echo "$block" | grep 'Source:' | sed 's/^ *//')"
+    fi
+  else
+    fail "plugin marketplace: claude-tui-line not registered"
+  fi
 fi
 echo
 
@@ -415,6 +523,7 @@ if [[ "$all_ok" == "1" ]]; then
   pass "already installed"
   info "claude-tui-line: $cli_bin"
   info "claude-tui-line-mcp: $mcp_bin"
+  [[ "$DRY_RUN" == "1" ]] && exit 0
   echo
   if confirm "Rebuild and redeploy anyway?"; then
     do_build
@@ -423,16 +532,16 @@ if [[ "$all_ok" == "1" ]]; then
   exit 0
 fi
 
+if [[ "$DRY_RUN" == "1" ]]; then
+  echo
+  print_plan
+  exit 0
+fi
+
 if [[ ! -t 0 && "$NON_INTERACTIVE" != "1" ]]; then
   echo
   fail "no TTY and --non-interactive not given — refusing to write anything"
-  info "this run would have:"
-  [[ "$c1_ok" != "1" || "$c2_ok" != "1" || "$c7_ok" != "1" ]] && info "  - built and deployed claude-tui-line and claude-tui-line-mcp into $BIN_DIR"
-  [[ "$c4_ok" != "1" ]] && info "  - chmod +x $MCP_WRAPPER"
-  [[ "$c5_ok" != "1" ]] && info "  - rewritten settings.json statusLine from '${current_status_line:-<none>}' to $target_status_line"
-  [[ "$c6_mcp_ok" != "1" ]] && info "  - registered the MCP server (claude mcp add -s $MCP_SCOPE)"
-  [[ "$c6_plugin_ok" != "1" ]] && info "  - registered the plugin as a local checkout ($REPO_ROOT)"
-  [[ "$c3_ok" != "1" ]] && info "  - (and .mcp.json needs a by-hand fix — install.sh will not touch it)"
+  print_plan
   info "re-run with a TTY, or pass --non-interactive to proceed unattended"
   exit 1
 fi
@@ -499,9 +608,9 @@ if [[ "$c5_ok" != "1" ]]; then
 fi
 
 if [[ "$c6_mcp_ok" != "1" ]]; then
-  if confirm "Register the claude-tui-line MCP server (claude mcp add -s $MCP_SCOPE, at $MCP_WRAPPER)?"; then
+  if confirm "Register the claude-tui-line MCP server (claude mcp add -s $MCP_SCOPE, at $MCP_TARGET)?"; then
     claude mcp remove -s "$MCP_SCOPE" claude-tui-line >/dev/null 2>&1 || true
-    if claude mcp add -s "$MCP_SCOPE" claude-tui-line "$MCP_WRAPPER"; then
+    if claude mcp add -s "$MCP_SCOPE" claude-tui-line "$MCP_TARGET"; then
       pass "MCP server registered ($MCP_SCOPE scope)"
     else
       fail "claude mcp add failed"
@@ -525,7 +634,7 @@ if [[ "$c6_plugin_ok" != "1" ]]; then
     do_install=1
     if claude plugin marketplace add "$REPO_ROOT"; then
       post_add_block=$(marketplace_block)
-      if ! echo "$post_add_block" | grep -Fq "Source: Directory ($REPO_ROOT)"; then
+      if ! marketplace_is_repo "$post_add_block"; then
         # Re-adding did not cleanly replace an existing (e.g. GitHub-sourced)
         # marketplace entry of the same name. Removal is destructive to
         # registration state, so it gets its own named prompt/opt-in — never
@@ -600,8 +709,9 @@ else
   verify_failed=1
 fi
 
-final_block=$(marketplace_block)
-if echo "$final_block" | grep -Fq "Source: Directory ($REPO_ROOT)"; then
+if [[ "$MODE" == "snapshot" ]]; then
+  pass "plugin: running from the installed snapshot"
+elif final_block=$(marketplace_block); marketplace_is_repo "$final_block"; then
   pass "plugin: local checkout ($REPO_ROOT)"
 else
   warn "plugin: $(echo "$final_block" | grep 'Source:' | sed 's/^ *//')"

@@ -1,3 +1,21 @@
+# claude-tui-line 0.5.0 — install from the marketplace snapshot
+
+`/claude-tui-line:setup` now works whether the plugin came from the marketplace or from a git clone.
+
+- `install.sh` detects snapshot mode (plugin cache under `~/.claude/plugins/`) and builds from it
+  instead of refusing. Binaries deploy to `~/.claude/claude-tui-line/bin` so uninstalling the plugin
+  never strands the statusline.
+- When the marketplace source is a local clone, setup hands off to the clone's `install.sh`
+  automatically, so a stale snapshot can't downgrade a newer clone.
+- `install.sh --dry-run` prints the plan; setup shows it and asks for one "apply this plan" approval.
+- A notify-only SessionStart hook compares the deployed build's version stamp with the plugin
+  version and prints a notice on mismatch. It never builds or blocks.
+- Fixed: `claude plugin marketplace list` reports local checkouts as `Folder (...)`, which
+  `install.sh` never matched (it looked for `Directory`). Both labels are now recognised.
+- New `tools/check-install.sh` (sandboxed install tests), wired into `tools/check-all.sh`.
+
+---
+
 # claude-tui-line 0.4.0 — first release
 
 claude-tui-line is a statusline framework for Claude Code. You compose a statusline from panes
