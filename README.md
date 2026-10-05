@@ -37,6 +37,11 @@ from source rather than shipping a binary.
 
 You need the .NET 10 SDK, `jq`, and the `claude` CLI on your PATH.
 
+You don't need to clone anything. `/plugin marketplace add` and `/plugin install` fetch a snapshot of
+the repo into Claude's plugin cache, and `/claude-tui-line:setup` runs that snapshot's `install.sh` to
+build it. Installing the plugin does not build or configure anything by itself: you run `setup`
+explicitly, and it asks before it writes anything.
+
 `setup` checks your toolchain and shows you a plan of everything it would change. Nothing is
 written until you approve it. It then builds, **backs up whatever statusline you already have**
 before touching anything, writes the new `statusLine` setting, and shows you a rendered preview.
@@ -75,8 +80,8 @@ would capture claude-tui-line's own command as the thing to restore. `revert` ta
 by default, so the escape hatch survives any number of changes. See
 [docs/backup-ledger.md](docs/backup-ledger.md).
 
-> These three need the CLI (`--items`, `--check`, `--preview`), which is now built and tested —
-> see [CLI](#cli) below. `setup` works today.
+> These three need the CLI (`--items`, `--check`, `--preview`), which is built and tested —
+> see [CLI](#cli) below.
 
 ### By hand
 
