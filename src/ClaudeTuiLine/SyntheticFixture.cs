@@ -55,7 +55,8 @@ public static class SyntheticFixture
 
     public static ItemContext CreateItemContext(ItemSettingsJsonConfig? itemSettings = null) =>
         new(Input, gitBranch: "feat/eng-1234", engram: SyntheticEngram,
-            remoteUrlProbe: () => "https://github.com/acme/acme-web", itemSettings);
+            remoteUrlProbe: () => "https://github.com/acme/acme-web", itemSettings,
+            hierarchyProbe: () => new HierarchyEntry("warn", "2 live · 1 out · 1 blocked", "2/1 1b"));
 
     // §12.3.1/§12.7.1/§12.7.2: the payload the --fixture flag emits. Every field of Input, except
     // Cwd, which is replaced by the process's real working directory — piping this through

@@ -2,11 +2,74 @@
 
 Running progress against `SPEC-V2-FRAMEWORK.md`. Updated as work lands.
 
-**Last updated:** 2026-08-15
+**Last updated:** 2026-10-07
 
 A line is only **Done** here if it was verified independently of the report claiming it —
 rebuilt from source with a matching SHA-256, or checked against rendered bytes. "Tests pass" is
 not by itself enough; this project has twice had a green suite over a broken instrument.
+
+---
+
+## Current — handoff, 2026-10-07
+
+Everything below this section was last reconciled on 2026-08-15 and has not been brought up to
+date since. Treat it as history, not as the current queue.
+
+**Waiting on one decision: merging PR #3.** Branch `ah-status-items` →
+[PR #3](https://github.com/agentic-tool-labs/claude-tui-line/pull/3), open and unmerged; merging
+is Jim's call. `main` is at `eddca0c` (0.5.0, snapshot and clone installs, PR #2). Nothing else
+is in flight.
+
+**What PR #3 ships (0.6.0):** [SPEC-106](specs/SPEC-106-ah-status-items.md), the opt-in `ah` and
+`ah-short` items. They render agent-hierarchy's precomputed `.claude/hierarchy/status.json`; this
+is part P2a of agent-tools spec 0071. `ah` renders in the house label:value style with one space
+after the colon (`ah: 2 live · 1 out`). `ah-short` is the narrow form, with its own settings
+block, `itemSettings.ahShort`.
+
+| Commit | What |
+|---|---|
+| `b55a51d` | The items |
+| `b618809` | Review fixes: path normalisation, pinned narrow literal, `ah-short` key case, opt-in docs |
+| `a158f95` | Rev 3 read hardening: file-type checks, a buffer sized from the open handle, `stateColors` unknown keys |
+| `10b515e` | E7 waiver recorded |
+| `73ddab9` | Lock wording corrected; the `mkfifo` path passed as an argument |
+
+**Verified:**
+
+- Full suite **1894/0/0** at `10b515e` (1852 `ClaudeTuiLine` + 42 MCP).
+- `HierarchyStatusTests` 66/66 at `73ddab9`.
+- `tools/check-examples.sh` exits 0.
+- AOT publish has no IL warnings, and `--version` reports 0.6.0.
+- Reviewer: APPROVE.
+- **Live:** Jim installed 0.6.0 to `~/.claude/claude-tui-line/bin` and saw the `ah` item render
+  while hierarchy agents were live.
+
+**When `ah` shows is by design, not a defect.** agent-hierarchy writes
+`visible = enabled && (live > 0 || out > 0 || anyPipeline)` (agent-tools `lib-status.mjs:334`).
+It refreshes the file at SessionStart and on UserPromptSubmit, Stop and PostToolUse.
+claude-tui-line renders nothing in any of these cases:
+
+- `visible` is false;
+- the file is absent;
+- the current session is itself listed in `member_sessions`.
+
+So an idle repo shows no `ah` item.
+
+**Waived or deferred:**
+
+- E7, the 1 ms per-render bench, was waived by Jim (SPEC-106 §K). The statusline refreshes about
+  once a second, so 1 ms per render doesn't matter.
+- Review nit 7: `labelColor` is not validated in `LabeledSegment`. Left for a future spec.
+- `tools/check-citations.sh` fails on `main` with 541 pre-existing lines from other specs. It is
+  not a gate for this PR.
+
+**Upstream (agent-tools):** agent-tools has its own 0071 reader hardening (`ec359e3`, `4324696`)
+on branch `ah/pipeline-0071-hierarchy-status-view`. It was unpushed at the last report and
+matches PR #3's read rule. Their readers cap the file at 4096 bytes and ours at 262,144; the
+difference is deliberate. We owe them nothing.
+
+**Records:** dispatch and response files are under `.claude/hierarchy/msgs/`. The final pair is
+re-review `20261005-194558-5osb` and suite run `20261005-194558-z3oj`.
 
 ---
 

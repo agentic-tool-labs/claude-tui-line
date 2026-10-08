@@ -1,7 +1,7 @@
 {
   "name": "claude-tui-line",
   "displayName": "claude-tui-line",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "A statusline framework for Claude Code: compose panes and items, wire in your own shell or Python scripts, and render it all inside a bordered TUI surface.",
   "author": {
     "name": "Jim Cline",

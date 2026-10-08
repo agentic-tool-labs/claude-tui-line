@@ -21,7 +21,7 @@ public class SchemaCommandTests
         "itemSettings", "directoryItemSettings", "contextItemSettings",
         "worktreeItemSettings", "rateLimitsItemSettings", "prItemSettings", "linearItemSettings",
         "outputStyleItemSettings", "autocompactItemSettings", "engramItemSettings",
-        "engramField", "engramStateColors",
+        "engramField", "engramStateColors", "ahItemSettings", "ahStateColors",
     };
 
     [Fact]

@@ -74,6 +74,12 @@ public sealed class ItemSettingsJsonConfig
     [JsonPropertyName("engram")]
     public EngramItemSettings? Engram { get; set; }
 
+    [JsonPropertyName("ah")]
+    public AhItemSettings? Ah { get; set; }
+
+    [JsonPropertyName("ahShort")]
+    public AhItemSettings? AhShort { get; set; }
+
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? Extra { get; set; }
 }
@@ -136,6 +142,32 @@ public sealed class OutputStyleItemSettings : LabeledItemSettings
 
 public sealed class AutocompactItemSettings : LabeledItemSettings
 {
+}
+
+/// Settings for one agent-hierarchy status item; `ah` and `ah-short` each read their own block.
+public sealed class AhItemSettings : LabeledItemSettings
+{
+    [JsonPropertyName("stateColors")]
+    public AhStateColorsJsonConfig? StateColors { get; set; }
+}
+
+/// Per-tone colour overrides for an ah item. All default null; the defaults live in the render code.
+public sealed class AhStateColorsJsonConfig
+{
+    [JsonPropertyName("work")]
+    public string? Work { get; set; }
+
+    [JsonPropertyName("warn")]
+    public string? Warn { get; set; }
+
+    [JsonPropertyName("bad")]
+    public string? Bad { get; set; }
+
+    [JsonPropertyName("idle")]
+    public string? Idle { get; set; }
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// Settings for the engram item. Each color overrides one fragment; unset keeps
@@ -766,6 +798,8 @@ internal sealed class BorderConfigConverter : JsonConverter<BorderConfig?>
 [JsonSerializable(typeof(OutputStyleItemSettings))]
 [JsonSerializable(typeof(AutocompactItemSettings))]
 [JsonSerializable(typeof(EngramItemSettings))]
+[JsonSerializable(typeof(AhItemSettings))]
+[JsonSerializable(typeof(AhStateColorsJsonConfig))]
 public partial class ConfigJsonContext : JsonSerializerContext
 {
 }

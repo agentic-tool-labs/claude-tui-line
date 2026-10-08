@@ -618,6 +618,9 @@ public static class ConfigChecker
             yield return UnknownColor("/itemSettings/autocompact/labelColor", autocompactLabelColor);
         }
 
+        foreach (var d in CheckAhSettings(config?.ItemSettings?.Ah, "/itemSettings/ah")) yield return d;
+        foreach (var d in CheckAhSettings(config?.ItemSettings?.AhShort, "/itemSettings/ahShort")) yield return d;
+
         if (config?.ItemSettings?.Engram?.FactsColor is { Length: > 0 } factsColor && ColorResolution.ResolveLiteral(factsColor) is null)
         {
             yield return UnknownColor("/itemSettings/engram/factsColor", factsColor);
@@ -744,6 +747,32 @@ public static class ConfigChecker
             if (stateColors.Unavailable is { Length: > 0 } unavailable && ColorResolution.ResolveLiteral(unavailable) is null)
             {
                 yield return UnknownColor("/itemSettings/engram/stateColors/unavailable", unavailable);
+            }
+        }
+    }
+
+    private static IEnumerable<Diagnostic> CheckAhSettings(AhItemSettings? settings, string basePath)
+    {
+        if (settings is null)
+        {
+            yield break;
+        }
+
+        if (settings.LabelColor is { Length: > 0 } labelColor && ColorResolution.ResolveLiteral(labelColor) is null)
+        {
+            yield return UnknownColor($"{basePath}/labelColor", labelColor);
+        }
+
+        if (settings.StateColors is not { } colors)
+        {
+            yield break;
+        }
+
+        foreach (var (tone, value) in new[] { ("work", colors.Work), ("warn", colors.Warn), ("bad", colors.Bad), ("idle", colors.Idle) })
+        {
+            if (value is { Length: > 0 } && ColorResolution.ResolveLiteral(value) is null)
+            {
+                yield return UnknownColor($"{basePath}/stateColors/{tone}", value);
             }
         }
     }
@@ -1448,6 +1477,28 @@ public static class ConfigChecker
             {
                 yield return (worktreeSettings.Extra, ConfigJsonContext.Default.WorktreeItemSettings,
                     "the worktree item's settings", "/itemSettings/worktree");
+            }
+
+            if (itemSettings.Ah is { } ahSettings)
+            {
+                yield return (ahSettings.Extra, ConfigJsonContext.Default.AhItemSettings,
+                    "the ah item's settings", "/itemSettings/ah");
+                if (ahSettings.StateColors is { } ahSettingsStateColors)
+                {
+                    yield return (ahSettingsStateColors.Extra, ConfigJsonContext.Default.AhStateColorsJsonConfig,
+                        "the ah item's stateColors", "/itemSettings/ah/stateColors");
+                }
+            }
+
+            if (itemSettings.AhShort is { } ahShortSettings)
+            {
+                yield return (ahShortSettings.Extra, ConfigJsonContext.Default.AhItemSettings,
+                    "the ah-short item's settings", "/itemSettings/ahShort");
+                if (ahShortSettings.StateColors is { } ahShortSettingsStateColors)
+                {
+                    yield return (ahShortSettingsStateColors.Extra, ConfigJsonContext.Default.AhStateColorsJsonConfig,
+                        "the ah-short item's stateColors", "/itemSettings/ahShort/stateColors");
+                }
             }
         }
 

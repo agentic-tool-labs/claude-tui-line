@@ -1,3 +1,17 @@
+# claude-tui-line 0.6.0 — agent-hierarchy status items
+
+Two new opt-in items show the live agent-hierarchy summary.
+
+- `ah` renders `ah: 2 live · 1 out · 1 blocked`; `ah-short` renders `ah: 2/1 1b` for narrow panes.
+  Both are coloured by the status tone (blue, yellow, red, grey).
+- They need agent-hierarchy ≥ 0.110.0 to show anything: they read
+  `<git root>/.claude/hierarchy/status.json`, and show nothing when it is missing or unusable.
+- They are hidden in live team members' sessions. Every other session in the checkout shows them.
+- Configure with `itemSettings.ah` and `itemSettings.ahShort`, one block per item, each with
+  `showLabel`, `labelColor` and `stateColors`.
+
+---
+
 # claude-tui-line 0.5.0 — install from the marketplace snapshot
 
 `/claude-tui-line:setup` now works whether the plugin came from the marketplace or from a git clone.

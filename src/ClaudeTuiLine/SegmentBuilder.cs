@@ -333,6 +333,30 @@ public static class SegmentBuilder
     private static bool IsDefaultOrEmptyStyle(OutputStyleInfo? style) =>
         style is null || string.IsNullOrEmpty(style.Name) || string.Equals(style.Name, "default", StringComparison.OrdinalIgnoreCase);
 
+    internal const string AhFormat = "ah: {}";
+
+    internal static string? ResolveAh(ItemContext ctx, bool useShort) =>
+        ctx.Hierarchy is { } entry && (useShort ? entry.Short : entry.Text) is { } v && !string.IsNullOrWhiteSpace(v) ? v : null;
+
+    internal static Segment? BuildAh(ItemContext ctx, bool useShort, AhItemSettings? settings) =>
+        ResolveAh(ctx, useShort) is { } raw
+            ? LabeledSegment(AhFormat, raw, AhToneColor(ctx.Hierarchy!.Tone, settings?.StateColors), settings)
+            : null;
+
+    // An unknown tone renders as idle. A configured colour that does not parse falls back to the
+    // default, because the colour is interpolated into markup unvalidated.
+    private static string AhToneColor(string tone, AhStateColorsJsonConfig? colors)
+    {
+        var (configured, fallback) = tone switch
+        {
+            "work" => (colors?.Work, "blue"),
+            "warn" => (colors?.Warn, "yellow"),
+            "bad" => (colors?.Bad, "red"),
+            _ => (colors?.Idle, "grey"),
+        };
+        return configured is { Length: > 0 } && ColorResolution.ResolveLiteral(configured) is not null ? configured : fallback;
+    }
+
     internal const string AutocompactFormat = "autocompact:{}";
 
     // ponytail: no per-render cache — up to 3 small file reads per render; add a cache
