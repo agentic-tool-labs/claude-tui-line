@@ -982,6 +982,123 @@ public class SegmentBuilderTests
         Assert.Equal("auto", SegmentBuilder.ResolveAutocompact(projectDir, homeDir: null, envWindow: null));
     }
 
+    private const string ModelSettingsJson =
+        "{\"autoCompactWindow\": 900000, \"modelSettings\": {\"claude-sonnet-5-5\": {\"autoCompactWindow\": 600000}}}";
+
+    [Fact]
+    public void ResolveAutocompact_ModelWindow_BeatsTopLevelWindowInSameFile()
+    {
+        var dir = NewTempDir();
+        WriteSettings(dir, "settings.json", ModelSettingsJson);
+
+        Assert.Equal("600K", SegmentBuilder.ResolveAutocompact(dir, homeDir: null, envWindow: null, modelId: "claude-sonnet-5-5"));
+    }
+
+    [Fact]
+    public void ResolveAutocompact_ModelEnabledFalse_YieldsOffDespiteTopLevelEnabled()
+    {
+        var dir = NewTempDir();
+        WriteSettings(dir, "settings.json",
+            "{\"autoCompactEnabled\": true, \"modelSettings\": {\"m\": {\"autoCompactEnabled\": false}}}");
+
+        Assert.Equal("off", SegmentBuilder.ResolveAutocompact(dir, homeDir: null, envWindow: null, modelId: "m"));
+    }
+
+    [Fact]
+    public void ResolveAutocompact_ModelSettingsForOtherModel_AreIgnored()
+    {
+        var dir = NewTempDir();
+        WriteSettings(dir, "settings.json", ModelSettingsJson);
+
+        Assert.Equal("900K", SegmentBuilder.ResolveAutocompact(dir, homeDir: null, envWindow: null, modelId: "claude-opus-5"));
+    }
+
+    [Theory]
+    [InlineData("Claude-Sonnet-5-5")]
+    [InlineData("claude-sonnet-5")]
+    [InlineData("claude-sonnet-5-5-20260101")]
+    public void ResolveAutocompact_ModelIdMatchIsOrdinalAndExact(string modelId)
+    {
+        var dir = NewTempDir();
+        WriteSettings(dir, "settings.json", ModelSettingsJson);
+
+        Assert.Equal("900K", SegmentBuilder.ResolveAutocompact(dir, homeDir: null, envWindow: null, modelId: modelId));
+    }
+
+    [Fact]
+    public void ResolveAutocompact_ModelIdWithTrailingBracketGroup_FallsBackToStrippedId()
+    {
+        var dir = NewTempDir();
+        WriteSettings(dir, "settings.json", ModelSettingsJson);
+
+        Assert.Equal("600K", SegmentBuilder.ResolveAutocompact(dir, homeDir: null, envWindow: null, modelId: "claude-sonnet-5-5[1m]"));
+    }
+
+    [Fact]
+    public void ResolveAutocompact_ExactModelIdWithBracketGroup_BeatsStrippedId()
+    {
+        var dir = NewTempDir();
+        WriteSettings(dir, "settings.json",
+            "{\"modelSettings\": {\"m[1m]\": {\"autoCompactWindow\": 700000}, \"m\": {\"autoCompactWindow\": 600000}}}");
+
+        Assert.Equal("700K", SegmentBuilder.ResolveAutocompact(dir, homeDir: null, envWindow: null, modelId: "m[1m]"));
+    }
+
+    [Theory]
+    [InlineData("claude-sonnet-5-5[1m")]
+    [InlineData("claude-sonnet-5-5[1m][x]")]
+    [InlineData("claude-sonnet-5-5[1m]x")]
+    [InlineData("[1m]")]
+    public void ResolveAutocompact_MalformedOrDoubleBracketSuffix_IsNotStripped(string modelId)
+    {
+        var dir = NewTempDir();
+        WriteSettings(dir, "settings.json", ModelSettingsJson);
+
+        Assert.Equal("900K", SegmentBuilder.ResolveAutocompact(dir, homeDir: null, envWindow: null, modelId: modelId));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void ResolveAutocompact_NullOrEmptyModelId_UsesTopLevel(string? modelId)
+    {
+        var dir = NewTempDir();
+        WriteSettings(dir, "settings.json", ModelSettingsJson);
+
+        Assert.Equal("900K", SegmentBuilder.ResolveAutocompact(dir, homeDir: null, envWindow: null, modelId: modelId));
+    }
+
+    [Fact]
+    public void ResolveAutocompact_ModelWindowInHome_DoesNotBeatTopLevelWindowInLocal()
+    {
+        var projectDir = NewTempDir();
+        var homeDir = NewTempDir();
+        WriteSettings(projectDir, "settings.local.json", "{\"autoCompactWindow\": 300000}");
+        WriteSettings(homeDir, "settings.json", ModelSettingsJson);
+
+        Assert.Equal("300K", SegmentBuilder.ResolveAutocompact(projectDir, homeDir, envWindow: null, modelId: "claude-sonnet-5-5"));
+    }
+
+    [Fact]
+    public void ResolveAutocompact_WrongTypedModelEnabled_FallsBackToTopLevel()
+    {
+        var dir = NewTempDir();
+        WriteSettings(dir, "settings.json",
+            "{\"autoCompactEnabled\": false, \"modelSettings\": {\"m\": {\"autoCompactEnabled\": \"yes\"}}}");
+
+        Assert.Equal("off", SegmentBuilder.ResolveAutocompact(dir, homeDir: null, envWindow: null, modelId: "m"));
+    }
+
+    [Fact]
+    public void ResolveAutocompact_NonObjectModelSettings_IsIgnored()
+    {
+        var dir = NewTempDir();
+        WriteSettings(dir, "settings.json",
+            "{\"autoCompactWindow\": 900000, \"modelSettings\": {\"m\": 5}}");
+
+        Assert.Equal("900K", SegmentBuilder.ResolveAutocompact(dir, homeDir: null, envWindow: null, modelId: "m"));
+    }
+
     [Theory]
     [InlineData("off")]
     [InlineData("auto")]

@@ -368,7 +368,8 @@ public static class SegmentBuilder
         ResolveAutocompact(
             ctx.Input.Cwd,
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            Environment.GetEnvironmentVariable("CLAUDE_CODE_AUTO_COMPACT_WINDOW"));
+            Environment.GetEnvironmentVariable("CLAUDE_CODE_AUTO_COMPACT_WINDOW"),
+            ctx.Input.Model?.Id);
 
     /// <summary>
     /// SPEC-102-showlabel-and-autocompact.md §B.2: <paramref name="projectDir"/>/<paramref name="homeDir"/>/
@@ -377,11 +378,11 @@ public static class SegmentBuilder
     /// <c>~/.claude/settings.json</c>. The two dimensions (enabled, window) resolve independently and may
     /// come from different files, matching how Claude Code's own settings merge works.
     /// </summary>
-    internal static string? ResolveAutocompact(string? projectDir, string? homeDir, string? envWindow)
+    internal static string? ResolveAutocompact(string? projectDir, string? homeDir, string? envWindow, string? modelId = null)
     {
         var settingsPaths = AutocompactSettingsPaths(projectDir, homeDir);
 
-        var enabled = FindBoolSetting(settingsPaths, "autoCompactEnabled") ?? true;
+        var enabled = FindBoolSetting(settingsPaths, "autoCompactEnabled", modelId) ?? true;
         if (!enabled)
         {
             return "off";
@@ -392,7 +393,7 @@ public static class SegmentBuilder
             return FormatAutocompactTokens(envTokens);
         }
 
-        var windowElement = FindJsonSetting(settingsPaths, "autoCompactWindow");
+        var windowElement = FindJsonSetting(settingsPaths, "autoCompactWindow", modelId);
         return windowElement is { } el && TryNormalizeAutocompactWindow(el, out var tokens)
             ? FormatAutocompactTokens(tokens)
             : "auto";
@@ -415,31 +416,75 @@ public static class SegmentBuilder
         return paths;
     }
 
+    // Within one file, modelSettings.<modelId>.<key> is consulted before the top-level <key>. The
+    // exact id is tried first, then the id with one trailing "[...]" group removed (a context-size
+    // suffix such as "[1m]" may be appended to the id). Matching is ordinal and a non-object
+    // modelSettings entry is ignored.
+    private static IEnumerable<JsonElement> SettingCandidates(JsonElement root, string key, string? modelId)
+    {
+        if (!string.IsNullOrEmpty(modelId) &&
+            root.TryGetProperty("modelSettings", out var all) && all.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var id in ModelIdLookupKeys(modelId))
+            {
+                if (all.TryGetProperty(id, out var perModel) && perModel.ValueKind == JsonValueKind.Object &&
+                    perModel.TryGetProperty(key, out var modelValue))
+                {
+                    yield return modelValue;
+                }
+            }
+        }
+
+        if (root.TryGetProperty(key, out var topValue))
+        {
+            yield return topValue;
+        }
+    }
+
+    private static IEnumerable<string> ModelIdLookupKeys(string modelId)
+    {
+        yield return modelId;
+
+        var open = modelId.LastIndexOf('[');
+        if (open > 0 && modelId[^1] == ']')
+        {
+            yield return modelId[..open];
+        }
+    }
+
     // A present-but-wrong-typed value (e.g. autoCompactEnabled: "yes") is treated as not defined —
-    // TryGetProperty succeeds but the ValueKind guard below rejects it, so the scan continues to
-    // the next file exactly as if the key were absent there.
-    private static bool? FindBoolSetting(IReadOnlyList<string> paths, string key)
+    // the candidate is skipped and the scan continues exactly as if the key were absent there.
+    private static bool? FindBoolSetting(IReadOnlyList<string> paths, string key, string? modelId)
     {
         foreach (var path in paths)
         {
-            if (TryReadSettingsRoot(path) is { } root &&
-                root.TryGetProperty(key, out var prop) &&
-                prop.ValueKind is JsonValueKind.True or JsonValueKind.False)
+            if (TryReadSettingsRoot(path) is not { } root)
             {
-                return prop.GetBoolean();
+                continue;
+            }
+
+            foreach (var prop in SettingCandidates(root, key, modelId))
+            {
+                if (prop.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                {
+                    return prop.GetBoolean();
+                }
             }
         }
 
         return null;
     }
 
-    private static JsonElement? FindJsonSetting(IReadOnlyList<string> paths, string key)
+    private static JsonElement? FindJsonSetting(IReadOnlyList<string> paths, string key, string? modelId)
     {
         foreach (var path in paths)
         {
-            if (TryReadSettingsRoot(path) is { } root && root.TryGetProperty(key, out var prop))
+            if (TryReadSettingsRoot(path) is { } root)
             {
-                return prop;
+                foreach (var prop in SettingCandidates(root, key, modelId))
+                {
+                    return prop;
+                }
             }
         }
 

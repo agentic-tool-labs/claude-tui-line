@@ -38,6 +38,28 @@ public class StatusInputTests
     }
 
     [Fact]
+    public void ModelId_IsParsedFromModelObject()
+    {
+        var input = JsonSerializer.Deserialize(
+            "{\"model\":{\"id\":\"claude-sonnet-5-5\",\"display_name\":\"x\"}}",
+            StatusInputJsonContext.Default.StatusInput);
+
+        Assert.Equal("claude-sonnet-5-5", input?.Model?.Id);
+        Assert.Equal("x", input?.Model?.DisplayName);
+    }
+
+    [Fact]
+    public void ModelId_AbsentWhenOnlyDisplayNamePresent()
+    {
+        var input = JsonSerializer.Deserialize(
+            "{\"model\":{\"display_name\":\"x\"}}",
+            StatusInputJsonContext.Default.StatusInput);
+
+        Assert.Null(input?.Model?.Id);
+        Assert.Equal("x", input?.Model?.DisplayName);
+    }
+
+    [Fact]
     public void EmptyObject_AllFieldsAbsent()
     {
         var json = ReadFixture("empty.json");

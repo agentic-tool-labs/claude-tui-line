@@ -90,6 +90,9 @@ public sealed class PrInfo
 
 public sealed class ModelInfo
 {
+    [JsonPropertyName("id")]
+    public string? Id { get; set; }
+
     [JsonPropertyName("display_name")]
     public string? DisplayName { get; set; }
 }
