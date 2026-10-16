@@ -33,6 +33,17 @@ public class HyperlinkTests
     }
 
     [Fact]
+    public void RenderedLinkText_SwapsSlashesButKeepsUrlAndTags()
+    {
+        const string url = "https://github.com/acme/acme-web";
+        var rendered = OscHyperlink.EscapeForRender("x/y " + OscHyperlink.Wrap(url, "[blue]acme/acme-web [[a/b]][/]"));
+
+        Assert.StartsWith("x/y ", rendered);
+        Assert.Contains(Markup.Escape(url), rendered);
+        Assert.Contains("[blue]acme∕acme-web [[a∕b]][/]", rendered);
+    }
+
+    [Fact]
     public void ItemColor_OnALinkedItem_GoesInsideTheLink()
     {
         const string url = "https://github.com/acme/acme-web";
