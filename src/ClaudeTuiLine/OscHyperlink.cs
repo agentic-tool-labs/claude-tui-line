@@ -16,7 +16,12 @@ public static class OscHyperlink
     private const string OpenPrefix = Esc + "]8;;";
     public const string Close = Esc + "]8;;" + St;
 
-    public static string Wrap(string url, string text) => $"{OpenPrefix}{url}{St}{text}{Close}";
+    // Linked text is underlined so it reads as clickable; the underline lives inside the wrap so
+    // TryUnwrap can hand back the caller's own markup and a re-wrap never nests a second one.
+    private const string UnderlineOpen = "[underline]";
+    private const string UnderlineClose = "[/]";
+
+    public static string Wrap(string url, string text) => $"{OpenPrefix}{url}{St}{UnderlineOpen}{text}{UnderlineClose}{Close}";
 
     /// <summary>
     /// True when <paramref name="text"/> is exactly one OSC 8 open/text/close triple with nothing
@@ -50,6 +55,12 @@ public static class OscHyperlink
 
         url = afterPrefix[..stIndex];
         inner = text[innerStart..innerEnd];
+        if (inner.StartsWith(UnderlineOpen, StringComparison.Ordinal) && inner.EndsWith(UnderlineClose, StringComparison.Ordinal)
+            && inner.Length >= UnderlineOpen.Length + UnderlineClose.Length)
+        {
+            inner = inner[UnderlineOpen.Length..^UnderlineClose.Length];
+        }
+
         return true;
     }
 
@@ -89,7 +100,7 @@ public static class OscHyperlink
             var innerText = markup[(stIndex + St.Length)..closeIndex];
 
             result.Append(Markup.Escape(openThroughSt));
-            result.Append(innerText);
+            result.Append(SwapVisibleSlashes(innerText));
             result.Append(Markup.Escape(Close));
 
             cursor = closeIndex + Close.Length;
@@ -97,6 +108,52 @@ public static class OscHyperlink
         }
 
         result.Append(markup, cursor, markup.Length - cursor);
+        return result.ToString();
+    }
+
+    // herdr (with mouse capture on) runs its own URL detection over visible text and lets it win
+    // over the OSC 8 target whenever the text contains '/', so "owner/name" opens http://owner/name.
+    // Linked text shows U+2215 DIVISION SLASH instead, which looks the same and is not detected;
+    // the cost is that copying the text yields the lookalike. Only text outside Spectre [tags]
+    // changes, so closing tags like [/] and escaped [[ ]] survive.
+    internal const char VisibleSlash = '∕';
+
+    internal static string SwapVisibleSlashes(string markup)
+    {
+        if (!markup.Contains('/'))
+        {
+            return markup;
+        }
+
+        var result = new StringBuilder(markup.Length);
+        var inTag = false;
+        for (var i = 0; i < markup.Length; i++)
+        {
+            var c = markup[i];
+            if (!inTag && c == '[' && i + 1 < markup.Length && markup[i + 1] == '[')
+            {
+                result.Append("[[");
+                i++;
+                continue;
+            }
+
+            if (c == '[' && !inTag)
+            {
+                inTag = true;
+            }
+            else if (c == ']' && inTag)
+            {
+                inTag = false;
+            }
+            else if (c == '/' && !inTag)
+            {
+                result.Append(VisibleSlash);
+                continue;
+            }
+
+            result.Append(c);
+        }
+
         return result.ToString();
     }
 }

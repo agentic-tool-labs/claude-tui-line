@@ -32,6 +32,45 @@ public class HyperlinkTests
         }
     }
 
+    [Fact]
+    public void RenderedLinkText_SwapsSlashesButKeepsUrlAndTags()
+    {
+        const string url = "https://github.com/acme/acme-web";
+        var rendered = OscHyperlink.EscapeForRender("x/y " + OscHyperlink.Wrap(url, "[blue]acme/acme-web [[a/b]][/]"));
+
+        Assert.StartsWith("x/y ", rendered);
+        Assert.Contains(Markup.Escape(url), rendered);
+        Assert.Contains("[blue]acme∕acme-web [[a∕b]][/]", rendered);
+    }
+
+    [Fact]
+    public void ItemColor_OnALinkedItem_GoesInsideTheLink()
+    {
+        const string url = "https://github.com/acme/acme-web";
+        var segment = SegmentBuilder.BuildItemSegment("acme/acme-web", OscHyperlink.Wrap(url, "acme/acme-web"), "blue");
+
+        Assert.True(OscHyperlink.TryUnwrap(segment.Markup, out var outerUrl, out var inner));
+        Assert.Equal(url, outerUrl);
+        Assert.Equal("[blue]acme/acme-web[/]", inner);
+    }
+
+    [Fact]
+    public void LinkedText_IsUnderlinedOnce_AndUnwrapReturnsTheCallersMarkup()
+    {
+        const string url = "https://example.com/path";
+        var text = new string('A', 75);
+        var segment = new Segment(OscHyperlink.Wrap(url, $"[red]{text}[/]"), text);
+
+        Assert.True(OscHyperlink.TryUnwrap(segment.Markup, out _, out var inner));
+        Assert.Equal($"[red]{text}[/]", inner);
+
+        var buffer = PaneRenderer.RenderLeaf(new[] { segment }, 30, OverflowMode.Wrap, "…", new RenderNoteCollector());
+        foreach (var row in buffer.Rows)
+        {
+            Assert.Single(System.Text.RegularExpressions.Regex.Matches(row.Markup, @"\[underline\]"));
+        }
+    }
+
     // SPEC-2.6-vertical-marker-splice.md §7 test 5: the vertical marker splice must go through
     // the same SegmentTruncation.Truncate the horizontal axis uses, so a colored OSC 8 link
     // spliced with the marker still closes the link before the ellipsis (ruling d) and keeps the
