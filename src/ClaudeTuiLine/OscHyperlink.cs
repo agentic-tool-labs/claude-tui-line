@@ -16,7 +16,12 @@ public static class OscHyperlink
     private const string OpenPrefix = Esc + "]8;;";
     public const string Close = Esc + "]8;;" + St;
 
-    public static string Wrap(string url, string text) => $"{OpenPrefix}{url}{St}{text}{Close}";
+    // Linked text is underlined so it reads as clickable; the underline lives inside the wrap so
+    // TryUnwrap can hand back the caller's own markup and a re-wrap never nests a second one.
+    private const string UnderlineOpen = "[underline]";
+    private const string UnderlineClose = "[/]";
+
+    public static string Wrap(string url, string text) => $"{OpenPrefix}{url}{St}{UnderlineOpen}{text}{UnderlineClose}{Close}";
 
     /// <summary>
     /// True when <paramref name="text"/> is exactly one OSC 8 open/text/close triple with nothing
@@ -50,6 +55,12 @@ public static class OscHyperlink
 
         url = afterPrefix[..stIndex];
         inner = text[innerStart..innerEnd];
+        if (inner.StartsWith(UnderlineOpen, StringComparison.Ordinal) && inner.EndsWith(UnderlineClose, StringComparison.Ordinal)
+            && inner.Length >= UnderlineOpen.Length + UnderlineClose.Length)
+        {
+            inner = inner[UnderlineOpen.Length..^UnderlineClose.Length];
+        }
+
         return true;
     }
 

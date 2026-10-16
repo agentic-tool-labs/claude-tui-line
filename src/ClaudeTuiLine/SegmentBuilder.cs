@@ -102,10 +102,14 @@ public static class SegmentBuilder
     /// internal markup rather than replacing it — Spectre gives the inner tags their own span and
     /// leaves the outer colour to claim whatever text they don't.
     /// </summary>
+    // The colour goes inside an OSC 8 link, never around it: a terminal that sees SGR before the
+    // link opens (herdr, for one) drops the link's target.
     public static Segment BuildItemSegment(string plain, string markup, string? color, IReadOnlyList<StyledSpan>? spans = null) =>
         string.IsNullOrEmpty(color)
             ? new Segment(markup, plain, spans)
-            : new Segment($"[{color}]{markup}[/]", plain, null);
+            : OscHyperlink.TryUnwrap(markup, out var url, out var inner)
+                ? new Segment(OscHyperlink.Wrap(url, $"[{color}]{inner}[/]"), plain, null)
+                : new Segment($"[{color}]{markup}[/]", plain, null);
 
     /// <summary>
     /// SPEC-V2-FRAMEWORK.md §3.3: assembles a compound item's per-part spans into one
