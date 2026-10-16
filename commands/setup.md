@@ -140,6 +140,13 @@ Report, briefly:
 - that the MCP tools (`get_config_schema` and the rest) need a **session restart or
   `/reload-plugins`** before they appear, since a newly added MCP server is picked up at plugin load
   rather than immediately
+- **only if** `HERDR_ENV`, `TMUX`, `STY`, `SSH_CONNECTION` or `SSH_TTY` is set (or `TERM_PROGRAM`
+  is `herdr`, `tmux` or `screen`) and `FORCE_HYPERLINK` is unset: that Claude Code may not
+  recognise this terminal as hyperlink-capable and would then drop the statusline's links. The fix
+  is `claude-tui-line --enable-hyperlinks` (appends a guarded `FORCE_HYPERLINK=1` to their zsh or
+  bash profile; `--disable-hyperlinks` undoes it), or `FORCE_HYPERLINK=1 claude` for one run. Do
+  not run it or edit their shell profile or settings for them; name the command and let them
+  decide. Skip this bullet otherwise
 
 Do not invent configuration examples in your summary. Point them at the project README, which
 documents every pane key, all 21 built-in items, custom `command` items, derived items,

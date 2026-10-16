@@ -516,6 +516,10 @@ static async Task<int> RunCli(string[] args)
     var fixture = false;
     var schema = false;
     var calibrate = false;
+    var enableHyperlinks = false;
+    var disableHyperlinks = false;
+    string? profilePath = null;
+    var dryRun = false;
     string? calibrateSaw = null;
     var calibrateNoEllipsis = false;
     string? calibrateSet = null;
@@ -557,6 +561,23 @@ static async Task<int> RunCli(string[] args)
                 break;
             case "--calibrate":
                 calibrate = true;
+                break;
+            case "--enable-hyperlinks":
+                enableHyperlinks = true;
+                break;
+            case "--disable-hyperlinks":
+                disableHyperlinks = true;
+                break;
+            case "--dry-run":
+                dryRun = true;
+                break;
+            case "--profile":
+                if (i + 1 >= args.Length)
+                {
+                    return WriteUsageError(json, "--profile requires a path argument");
+                }
+
+                profilePath = args[++i];
                 break;
             case "--saw":
                 if (i + 1 >= args.Length)
@@ -624,10 +645,10 @@ static async Task<int> RunCli(string[] args)
     // are modes — exactly zero or one may appear in argv. This replaces the old pairwise mutual-
     // exclusion table (unmaintainable past four commands: six pairs become ten on a fifth), so the
     // rule holds for an eighth command without being edited.
-    var modeCount = new[] { check, version, items, colors, preview, accepted, fixture, schema, calibrate }.Count(selected => selected);
+    var modeCount = new[] { check, version, items, colors, preview, accepted, fixture, schema, calibrate, enableHyperlinks, disableHyperlinks }.Count(selected => selected);
     if (modeCount > 1)
     {
-        return WriteUsageError(json, "--check, --version, --items, --colors, --preview, --accepted, --fixture, --schema, and --calibrate are mutually exclusive");
+        return WriteUsageError(json, "--check, --version, --items, --colors, --preview, --accepted, --fixture, --schema, --calibrate, --enable-hyperlinks, and --disable-hyperlinks are mutually exclusive");
     }
 
     // SPEC-101 §12.9: the --calibrate sub-flags only mean anything alongside --calibrate itself —
@@ -663,6 +684,8 @@ static async Task<int> RunCli(string[] args)
         // the calibration state/record files live. The generic --config check below turns this
         // omission into the named usage error.
         : calibrate ? ("--calibrate", new[] { "json" })
+        : enableHyperlinks ? ("--enable-hyperlinks", new[] { "profile", "dry-run" })
+        : disableHyperlinks ? ("--disable-hyperlinks", new[] { "profile", "dry-run" })
         : ("rendering", new[] { "config" });
 
     if (json && !acceptedModifiers.Contains("json"))
@@ -690,6 +713,16 @@ static async Task<int> RunCli(string[] args)
         return WriteUsageError(json, $"--columns is not valid with {modeLabel}");
     }
 
+    if (dryRun && !acceptedModifiers.Contains("dry-run"))
+    {
+        return WriteUsageError(json, $"--dry-run is not valid with {modeLabel}");
+    }
+
+    if (profilePath is not null && !acceptedModifiers.Contains("profile"))
+    {
+        return WriteUsageError(json, $"--profile is not valid with {modeLabel}");
+    }
+
     if (configPath is not null && !acceptedModifiers.Contains("config"))
     {
         return WriteUsageError(json, $"--config is not valid with {modeLabel}");
@@ -704,6 +737,11 @@ static async Task<int> RunCli(string[] args)
     {
         Console.Out.WriteLine(AssemblyVersionInfo.InformationalVersion);
         return 0;
+    }
+
+    if (enableHyperlinks || disableHyperlinks)
+    {
+        return RunHyperlinks(enableHyperlinks, profilePath, dryRun);
     }
 
     if (colors)
@@ -782,7 +820,9 @@ static int RunCheck(bool json, string? explicitConfigPath)
         config = result.Config;
     }
 
-    var diagnostics = ConfigChecker.Check(config);
+    var diagnostics = ConfigChecker.Check(config)
+        .Concat(ConfigChecker.CheckEnvironment(config, name => Environment.GetEnvironmentVariable(name)))
+        .ToList();
     var hasError = diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error);
 
     if (json)
@@ -853,6 +893,35 @@ static int RunColors(bool json)
 // §1.1.3: reads no config and probes nothing — every value comes from the parser-colocated
 // registries #38 built, so there is no failure mode here beyond a crash. Always exits 0. No
 // plain-text form: --accepted requires --json, enforced before this is ever reached.
+// Edits a shell profile only because the user ran this command; the profile is chosen from $SHELL
+// unless --profile names one, and any other shell gets the line printed instead.
+static int RunHyperlinks(bool enable, string? profilePath, bool dryRun)
+{
+    var profile = profilePath ?? HyperlinksCommand.ProfilePath(
+        Environment.GetEnvironmentVariable("SHELL"),
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+    if (profile is null)
+    {
+        Console.Error.WriteLine("claude-tui-line: only zsh and bash profiles are edited automatically; use --profile <path>, or add this to your shell profile:");
+        Console.Error.WriteLine(HyperlinksCommand.ExportLine);
+        return 1;
+    }
+
+    try
+    {
+        var now = DateTimeOffset.UtcNow;
+        Console.Out.WriteLine(enable
+            ? HyperlinksCommand.Enable(profile, dryRun, now)
+            : HyperlinksCommand.Disable(profile, dryRun, now));
+        return 0;
+    }
+    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+    {
+        Console.Error.WriteLine($"claude-tui-line: cannot edit {profile}: {ex.Message}");
+        return 1;
+    }
+}
+
 static int RunAccepted()
 {
     var result = AcceptedCommand.Build();

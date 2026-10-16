@@ -719,6 +719,19 @@ else
 fi
 echo
 
+# Claude Code drops a statusline's OSC 8 links in terminals it does not recognise as
+# hyperlink-capable. This only informs: the install cannot know where claude will later run,
+# and a static FORCE_HYPERLINK would apply in terminals that do not support links.
+if [[ -z "${FORCE_HYPERLINK:-}" || "${FORCE_HYPERLINK:-}" == "0" ]] \
+  && { [[ -n "${HERDR_ENV:-}${TMUX:-}${STY:-}${SSH_CONNECTION:-}${SSH_TTY:-}" ]] \
+       || [[ "${TERM_PROGRAM:-}" =~ ^(herdr|tmux|screen)$ ]]; }; then
+  info "this terminal may not be recognised by Claude Code as hyperlink-capable, so statusline links could render as plain text"
+  info "  fix: $cli_bin --enable-hyperlinks   (adds a guarded FORCE_HYPERLINK=1 to your zsh/bash profile, with a backup; add --dry-run to preview, --disable-hyperlinks to undo)"
+  info "  or just for one run: FORCE_HYPERLINK=1 claude"
+  info "  claude-tui-line --check reports this too; see README: Links not clickable"
+  echo
+fi
+
 if [[ "$write_failed" == "1" || "$verify_failed" == "1" ]]; then
   fail "install incomplete — see warnings above"
   exit 1

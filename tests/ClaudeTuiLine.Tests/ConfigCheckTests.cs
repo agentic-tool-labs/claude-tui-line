@@ -15,6 +15,75 @@ public class ConfigCheckTests
         Assert.Empty(diagnostics);
     }
 
+    private static Func<string, string?> EnvOf(params (string Name, string Value)[] vars) =>
+        name => vars.Where(v => v.Name == name).Select(v => v.Value).FirstOrDefault();
+
+    private static UserConfig ConfigWith(PaneItemJsonConfig item) =>
+        new() { Items = new List<PaneItemJsonConfig> { item } };
+
+    [Theory]
+    [InlineData("HERDR_ENV", "1")]
+    [InlineData("TMUX", "/tmp/tmux-501/default,1,0")]
+    [InlineData("STY", "1.pts-0")]
+    [InlineData("SSH_CONNECTION", "10.0.0.1 22 10.0.0.2 22")]
+    [InlineData("SSH_TTY", "/dev/pts/0")]
+    [InlineData("TERM_PROGRAM", "herdr")]
+    [InlineData("TERM_PROGRAM", "tmux")]
+    public void LinkItemInUnrecognisedTerminal_WarnsHyperlinksUndetected(string name, string value)
+    {
+        var diagnostics = ConfigChecker.CheckEnvironment(ConfigWith(new() { Item = "repo" }), EnvOf((name, value)));
+
+        var d = Assert.Single(diagnostics);
+        Assert.Equal("hyperlinks-undetected", d.Code);
+        Assert.Equal(DiagnosticSeverity.Warning, d.Severity);
+    }
+
+    [Fact]
+    public void ExplicitLinkOnNonLinkItem_AlsoWarns()
+    {
+        var config = ConfigWith(new() { Item = "model", Link = "https://example.com/{}" });
+
+        var diagnostics = ConfigChecker.CheckEnvironment(config, EnvOf(("HERDR_ENV", "1")));
+
+        Assert.Single(diagnostics);
+    }
+
+    [Theory]
+    [InlineData("1")]
+    [InlineData("true")]
+    public void ForceHyperlinkSet_SuppressesWarning(string force)
+    {
+        var env = EnvOf(("HERDR_ENV", "1"), ("FORCE_HYPERLINK", force));
+
+        Assert.Empty(ConfigChecker.CheckEnvironment(ConfigWith(new() { Item = "repo" }), env));
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("")]
+    public void ForceHyperlinkZeroOrEmpty_DoesNotSuppressWarning(string force)
+    {
+        var env = EnvOf(("HERDR_ENV", "1"), ("FORCE_HYPERLINK", force));
+
+        Assert.Single(ConfigChecker.CheckEnvironment(ConfigWith(new() { Item = "repo" }), env));
+    }
+
+    [Fact]
+    public void RecognisedTerminal_ProducesNoWarning()
+    {
+        var env = EnvOf(("TERM_PROGRAM", "iTerm.app"));
+
+        Assert.Empty(ConfigChecker.CheckEnvironment(ConfigWith(new() { Item = "repo" }), env));
+    }
+
+    [Fact]
+    public void ConfigWithoutLinkItems_ProducesNoWarning()
+    {
+        var env = EnvOf(("HERDR_ENV", "1"));
+
+        Assert.Empty(ConfigChecker.CheckEnvironment(ConfigWith(new() { Item = "model" }), env));
+    }
+
     [Fact]
     public void UnknownItemSelector_ReportsUnknownItemId()
     {
