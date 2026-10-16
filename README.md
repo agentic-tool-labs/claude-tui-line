@@ -549,6 +549,28 @@ with `repo`'s own `owner/name` rather than duplicating it:
 `{}` here is `repo`'s own value (`owner/name`); `repo-host` supplies just the host, so the two
 compose into a full URL with no subprocess involved. `repo-host` isn't itself displayed anywhere.
 
+### Links not clickable
+
+Claude Code only forwards a statusline's links when it recognises your terminal as
+hyperlink-capable. Inside herdr, tmux, screen or an SSH session it may not, and the links are
+dropped with no error. `claude-tui-line --enable-hyperlinks` fixes it for every later session by
+appending a guarded `FORCE_HYPERLINK=1` export to `~/.zshenv` (zsh) or `~/.bashrc` (bash); the
+guard only fires inside herdr, tmux, screen or SSH, so plain terminals are untouched.
+`--dry-run` shows the change without writing anything. A real run first copies the profile to
+`<profile>.bak-claude-tui-line-<timestamp>`, writes through a temp file, and follows a symlinked
+profile to its real file. `claude-tui-line --disable-hyperlinks` removes the lines again, and
+`--profile <path>` targets another file. Start a new shell, then a new `claude` session.
+
+To do it by hand, set `FORCE_HYPERLINK=1` before starting `claude`:
+
+```sh
+FORCE_HYPERLINK=1 claude
+```
+
+In PowerShell, run `$env:FORCE_HYPERLINK = "1"` first. `claude-tui-line --check` warns
+(`hyperlinks-undetected`) when your config has link items and the environment looks like one of
+these terminals.
+
 ### Linking a branch's ticket id
 
 For Linear specifically, use the `linear` builtin — it extracts and uppercases the ticket id

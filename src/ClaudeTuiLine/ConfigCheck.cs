@@ -89,6 +89,49 @@ public static class ConfigChecker
         return diagnostics;
     }
 
+    private static readonly HashSet<string> LinkItemIds =
+        new(StringComparer.OrdinalIgnoreCase) { "directory", "git-branch", "repo", "pr", "linear" };
+
+    /// <summary>
+    /// Diagnostics that depend on the environment the check runs in rather than on the config
+    /// alone. Kept apart from <see cref="Check"/> so that result stays a pure function of the config.
+    /// </summary>
+    public static IReadOnlyList<Diagnostic> CheckEnvironment(UserConfig? config, Func<string, string?> env)
+    {
+        var root = ConfigLoader.ResolveRootPane(config, ConfigLoader.ResolveTopLevel(config));
+        if (!UsesLinks(root) || !MayDropHyperlinks(env))
+        {
+            return Array.Empty<Diagnostic>();
+        }
+
+        return new[]
+        {
+            new Diagnostic("/", DiagnosticSeverity.Warning, "hyperlinks-undetected",
+                "Claude Code may drop this statusline's hyperlinks in this terminal because it may not detect hyperlink support; run claude-tui-line --enable-hyperlinks, or set FORCE_HYPERLINK=1 before starting claude (README: \"Links not clickable\")"),
+        };
+    }
+
+    // Claude Code only forwards a statusline's OSC 8 links when it recognises the terminal as
+    // hyperlink-capable, and it does not recognise multiplexers or SSH sessions.
+    internal static bool MayDropHyperlinks(Func<string, string?> env)
+    {
+        var force = env("FORCE_HYPERLINK");
+        if (!string.IsNullOrEmpty(force) && force != "0")
+        {
+            return false;
+        }
+
+        bool IsSet(string name) => !string.IsNullOrEmpty(env(name));
+
+        return IsSet("HERDR_ENV") || IsSet("TMUX") || IsSet("STY")
+            || IsSet("SSH_CONNECTION") || IsSet("SSH_TTY")
+            || env("TERM_PROGRAM") is "herdr" or "tmux" or "screen";
+    }
+
+    private static bool UsesLinks(Pane pane) =>
+        pane.Items.Any(i => i.Link is { Length: > 0 } || (i.Item is { } id && LinkItemIds.Contains(id)))
+        || pane.Children.Any(UsesLinks);
+
     // ---- §4.0.1: maxLines is an opt-in ceiling — zero or negative has no meaningful reading ----
 
     private static IEnumerable<Diagnostic> CheckMaxLines(Pane root, string rootPath)
