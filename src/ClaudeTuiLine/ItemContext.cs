@@ -40,7 +40,16 @@ public sealed class ItemContext
     /// </summary>
     public HierarchyEntry? Hierarchy => _hierarchy.Value;
 
-    public ItemContext(StatusInput input, string? gitBranch, EngramProbeResult? engram, Func<string?> remoteUrlProbe, ItemSettingsJsonConfig? itemSettings = null, Func<HierarchyEntry?>? hierarchyProbe = null)
+    private readonly Lazy<AccountInfo?> _account;
+
+    /// <summary>
+    /// The account this session's login belongs to (<see cref="AccountProbe"/>): a Keychain or
+    /// file read plus a network call on a cache miss, so probed only when an email/organization
+    /// item reads it. Null when no probe was supplied.
+    /// </summary>
+    public AccountInfo? Account => _account.Value;
+
+    public ItemContext(StatusInput input, string? gitBranch, EngramProbeResult? engram, Func<string?> remoteUrlProbe, ItemSettingsJsonConfig? itemSettings = null, Func<HierarchyEntry?>? hierarchyProbe = null, Func<AccountInfo?>? accountProbe = null)
     {
         Input = input;
         GitBranch = gitBranch;
@@ -48,5 +57,6 @@ public sealed class ItemContext
         ItemSettings = itemSettings;
         _remoteUrl = new Lazy<string?>(remoteUrlProbe, System.Threading.LazyThreadSafetyMode.None);
         _hierarchy = new Lazy<HierarchyEntry?>(hierarchyProbe ?? (() => null), System.Threading.LazyThreadSafetyMode.None);
+        _account = new Lazy<AccountInfo?>(accountProbe ?? (() => null), System.Threading.LazyThreadSafetyMode.None);
     }
 }

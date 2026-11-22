@@ -340,13 +340,25 @@ everything else is in the **default set** — the list you get when a pane omits
 | `autocompact` | auto-compaction state and window size *(opt-in)* |
 | `ah` | agent-hierarchy status: live, out, blocked/overdue/stalled *(opt-in)* |
 | `ah-short` | abbreviated agent-hierarchy status *(opt-in)* |
+| `email` | the email of the Claude account this session is logged in to *(opt-in)* |
+| `organization` | that account's organization *(opt-in)* |
 
-`model-short`, `remote-url`, `repo-host`, `linear`, `autocompact`, `ah`, and `ah-short` are opt-in rather than default. `remote-url`
+`model-short`, `remote-url`, `repo-host`, `linear`, `autocompact`, `ah`, `ah-short`, `email`, and `organization` are opt-in rather than default. `remote-url`
 is opt-in because resolving it shells out to git, which you should only pay for if you asked for
 it. `repo-host` costs nothing to resolve — it's excluded because a bare hostname is noise in a
 rendered statusline; its purpose is to be referenced from a `link` template, not displayed on its
 own. `linear` is excluded because most branches carry no ticket id, so a default placement would
 render nothing on the majority of renders.
+
+`email` and `organization` are opt-in because resolving them reads the session's stored login (the
+macOS Keychain, or `.credentials.json` elsewhere) and, on a cache miss, asks Anthropic's profile
+endpoint who it belongs to. They follow `CLAUDE_SECURESTORAGE_CONFIG_DIR` and `CLAUDE_CONFIG_DIR`
+from the session, so two sessions on different logins show their own account even when they share
+`~/.claude.json`, whose `oauthAccount` (and so `/status`) names whoever logged in last. They show nothing when
+`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` is set, since the stored login isn't the one in
+use then. Only the access token is read, it is sent only to api.anthropic.com, and the cache keeps email and
+organization for ten minutes per login; a failed lookup keeps the last good value and retries after a
+minute.
 
 Each item entry accepts:
 

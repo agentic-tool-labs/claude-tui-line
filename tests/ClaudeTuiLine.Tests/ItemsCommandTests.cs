@@ -3,9 +3,9 @@ namespace ClaudeTuiLine.Tests;
 public class ItemsCommandTests
 {
     [Fact]
-    public void ItemRegistryAll_ContainsTwentyOneUniquelyIdentifiedItemsWithNonEmptyReports()
+    public void ItemRegistryAll_ContainsTwentyThreeUniquelyIdentifiedItemsWithNonEmptyReports()
     {
-        Assert.Equal(21, ItemRegistry.All.Count);
+        Assert.Equal(23, ItemRegistry.All.Count);
         Assert.Equal(ItemRegistry.All.Count, ItemRegistry.All.Select(i => i.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count());
         Assert.All(ItemRegistry.All, i => Assert.False(string.IsNullOrWhiteSpace(i.Reports)));
     }
@@ -35,7 +35,7 @@ public class ItemsCommandTests
         var result = ItemsCommand.Build();
 
         var nonDefault = result.Items.Where(i => !i.Default).Select(i => i.Id).OrderBy(id => id, StringComparer.Ordinal);
-        Assert.Equal(new[] { "ah", "ah-short", "autocompact", "linear", "model-short", "remote-url", "repo-host" }, nonDefault);
+        Assert.Equal(new[] { "ah", "ah-short", "autocompact", "email", "linear", "model-short", "organization", "remote-url", "repo-host" }, nonDefault);
     }
 
     [Fact]
