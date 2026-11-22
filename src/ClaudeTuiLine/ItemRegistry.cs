@@ -98,6 +98,14 @@ public static class ItemRegistry
             ctx => SegmentBuilder.ResolveAh(ctx, useShort: true),
             ctx => SegmentBuilder.BuildAh(ctx, useShort: true, ctx.ItemSettings?.AhShort),
             ItemColorKind.Semantic),
+        new("email", "the email of the Claude account this session is logged in to, from the session's own stored login rather than ~/.claude.json (which names whoever logged in last). Opt-in: a cache miss reads the login and asks Anthropic's profile endpoint, cached ten minutes per login",
+            ctx => SegmentBuilder.ResolveEmail(ctx.Account),
+            ctx => SegmentBuilder.BuildEmail(ctx.Account),
+            ItemColorKind.Decorative),
+        new("organization", "the organization of the Claude account this session is logged in to; resolved the same way as email",
+            ctx => SegmentBuilder.ResolveOrganization(ctx.Account),
+            ctx => SegmentBuilder.BuildOrganization(ctx.Account),
+            ItemColorKind.Decorative),
     };
 
     // The number comes straight from PrInfo.Number, never from ResolvePullRequest's rendered value,
@@ -219,9 +227,10 @@ public static class ItemRegistry
     // per SPEC-102-showlabel-and-autocompact.md §B.3: a new item must not silently appear in every
     // existing user's statusline.
     // ah and ah-short are opt-in for the same reason as autocompact, and because placing one costs a
-    // file read.
+    // file read. email and organization are opt-in because resolving them reads the stored login
+    // and, on a cache miss, calls the network.
     public static readonly IReadOnlyList<string> DefaultIds =
-        Items.Where(i => i.Id is not ("model-short" or "remote-url" or "repo-host" or "linear" or "autocompact" or "ah" or "ah-short"))
+        Items.Where(i => i.Id is not ("model-short" or "remote-url" or "repo-host" or "linear" or "autocompact" or "ah" or "ah-short" or "email" or "organization"))
             .Select(i => i.Id)
             .ToList();
 

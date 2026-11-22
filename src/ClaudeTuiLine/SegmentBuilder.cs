@@ -272,6 +272,18 @@ public static class SegmentBuilder
     internal static string? ResolveRemoteUrl(string? remoteUrl) =>
         string.IsNullOrEmpty(remoteUrl) ? null : remoteUrl;
 
+    internal static Segment? BuildEmail(AccountInfo? account) =>
+        ResolveEmail(account) is { } email ? SingleColor("aqua", email) : null;
+
+    internal static string? ResolveEmail(AccountInfo? account) =>
+        string.IsNullOrEmpty(account?.Email) ? null : account!.Email;
+
+    internal static Segment? BuildOrganization(AccountInfo? account) =>
+        ResolveOrganization(account) is { } org ? SingleColor("teal", org) : null;
+
+    internal static string? ResolveOrganization(AccountInfo? account) =>
+        string.IsNullOrEmpty(account?.Organization) ? null : account!.Organization;
+
     internal const string EffortFormat = "effort:{}";
 
     internal static Segment? BuildEffort(EffortInfo? effort) =>
