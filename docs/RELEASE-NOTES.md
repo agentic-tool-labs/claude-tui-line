@@ -1,3 +1,19 @@
+# claude-tui-line 0.8.0 — account email and organization items
+
+Two new opt-in items show which Claude account a session is logged in to.
+
+- `email` renders the account's email; `organization` renders its organization name.
+- They read the session's own stored login rather than `~/.claude.json`, whose `oauthAccount`
+  names whoever logged in last. Sessions on different logins that share one config, such as a
+  second login through `CLAUDE_SECURESTORAGE_CONFIG_DIR` or a separate `CLAUDE_CONFIG_DIR`, each
+  show their own account.
+- A cache miss reads the login (macOS Keychain, or `.credentials.json`) and asks Anthropic's
+  profile endpoint. Results are cached for ten minutes per login; a failed lookup keeps the last
+  good value and retries after a minute. Only the access token is read, and it is never cached or
+  passed on a command line.
+- They show nothing when `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` is set, since the stored
+  login is not the one in use then.
+
 # claude-tui-line 0.6.0 — agent-hierarchy status items
 
 Two new opt-in items show the live agent-hierarchy summary.
